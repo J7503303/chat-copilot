@@ -318,3 +318,326 @@ internal static IServiceCollection AddSemanticKernelServices(this IServiceCollec
 }
 
 ```
+
+---
+
+# Chat Copilot 后端 Web API 服务
+
+此目录包含 Chat Copilot 后端 Web API 服务的源代码。前端 Web 应用程序组件可在 [webapp/](../webapp/) 目录中找到。
+
+## 运行 Chat Copilot 示例
+
+要配置和运行完整的 Chat Copilot 应用程序或仅运行后端 API，请查看[主要说明](../README.md#instructions)。
+
+# （开发中）
+
+以下材料正在开发中，可能不完整或不准确。
+
+## Visual Studio Code
+
+1. 构建（CopilotChatWebApi）
+2. 运行（CopilotChatWebApi）
+3. [可选] 监视（CopilotChatWebApi）
+
+## Visual Studio（2022 或更新版本）
+
+1. 在 Visual Studio 2022 或更新版本中打开解决方案文件（`CopilotChat.sln`）。
+2. 在解决方案资源管理器中，右键单击 `CopilotChatWebApi` 并选择"设为启动项目"。
+3. 按 `F5` 或选择菜单项"调试"->"开始调试"开始调试。
+
+4. **（可选）** 要启用对上传图像文件格式（如 png、jpg 和 tiff）的支持，在 `./appsettings.json` 的 `KernelMemory:ImageOcrType` 部分有两个选项：Tesseract 开源库和 Azure Form Recognizer。
+   - **Tesseract** 我们已包含 [Tesseract](https://www.nuget.org/packages/Tesseract) NuGet 包。
+     - 您需要获取一个或多个 [tessdata 语言数据文件](https://github.com/tesseract-ocr/tessdata)，如 `eng.traineddata`，并将它们添加到您的 `./data` 目录或 `./appsettings.json` 中 `KernelMemory:Services:Tesseract:FilePath` 指定的位置。
+     - 将"复制到输出目录"值设置为"如果较新则复制"。
+   - **Azure AI Doc Intel** 我们已包含 [Azure.AI.FormRecognizer](https://www.nuget.org/packages/Azure.AI.FormRecognizer) NuGet 包。
+     - 您需要获取 [Azure AI Doc Intel](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence) 资源，并将 `KernelMemory:Services:AzureAIDocIntel:Endpoint` 和 `KernelMemory:Services:AzureAIDocIntel:Key` 值添加到 `./appsettings.json` 文件中。
+
+## 运行 [内存服务](https://github.com/microsoft/kernel-memory)
+
+内存服务处理内核内存的创建和查询，包括认知内存和文档。
+
+### 进程内处理（默认）
+
+在 webapi 进程中运行内存创建管道。这也意味着内存创建是同步的。
+
+无需额外配置。
+
+> 您可以选择 **Volatile** 或 **TextFile** 作为 SimpleVectorDb 实现。
+
+### 分布式处理
+
+在不同进程中运行内存创建管道步骤。这意味着内存创建是异步的。如果您同时有许多活跃的聊天会话或有需要几分钟处理的大文档，这可以实现更好的可扩展性。
+
+1. 在 [./webapi/appsettings.json](./appsettings.json) 中，将 `KernelMemory:DataIngestion:OrchestrationType` 设置为 `Distributed`。
+2. 在 [../memorypipeline/appsettings.json](../memorypipeline/appsettings.json) 中，将 `KernelMemory:DataIngestion:OrchestrationType` 设置为 `Distributed`。
+3. 确保 [./webapi/appsettings.json](./appsettings.json) 和 [../memorypipeline/appsettings.json](../memorypipeline/appsettings.json) 中的以下设置分别指向您机器上的相同位置，以便两个进程都可以访问数据：
+   - `KernelMemory:Services:SimpleFileStorage:Directory`
+   - `KernelMemory:Services:SimpleQueues:Directory`
+   - `KernelMemory:Services:SimpleVectorDb:Directory`
+     > 不要将 SimpleVectorDb 配置为使用 Volatile。Volatile 存储无法在进程间共享。
+4. 您需要同时运行 [webapi](./README.md) 和 [memorypipeline](../memorypipeline/README.md)。
+
+### （可选）使用托管资源：[Azure 存储帐户](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview)，[Azure 认知搜索](https://learn.microsoft.com/en-us/azure/search/search-what-is-azure-search)
+
+1. 在 [./webapi/appsettings.json](./appsettings.json) 和 [../memorypipeline/appsettings.json](../memorypipeline/appsettings.json) 中，将 `KernelMemory:DocumentStorageType` 设置为 `AzureBlobs`。
+2. 在 [./webapi/appsettings.json](./appsettings.json) 和 [../memorypipeline/appsettings.json](../memorypipeline/appsettings.json) 中，将 `KernelMemory:DataIngestion:DistributedOrchestration:QueueType` 设置为 `AzureQueue`。
+3. 在 [./webapi/appsettings.json](./appsettings.json) 和 [../memorypipeline/appsettings.json](../memorypipeline/appsettings.json) 中，将 `KernelMemory:DataIngestion:MemoryDbTypes:0` 设置为 `AzureAISearch`。
+4. 在 [./webapi/appsettings.json](./appsettings.json) 和 [../memorypipeline/appsettings.json](../memorypipeline/appsettings.json) 中，将 `KernelMemory:Retrieval:MemoryDbType` 设置为 `AzureAISearch`。
+5. 运行以下命令设置对资源的身份验证：
+
+   ```bash
+   dotnet user-secrets set KernelMemory:Services:AzureBlobs:Auth ConnectionString
+   dotnet user-secrets set KernelMemory:Services:AzureBlobs:ConnectionString [您的密钥]
+   dotnet user-secrets set KernelMemory:Services:AzureQueue:Auth ConnectionString   # 仅在运行分布式处理时需要
+   dotnet user-secrets set KernelMemory:Services:AzureQueue:ConnectionString [您的密钥]   # 仅在运行分布式处理时需要
+   dotnet user-secrets set KernelMemory:Services:AzureAISearch:Endpoint [您的密钥]
+   dotnet user-secrets set KernelMemory:Services:AzureAISearch:APIKey [您的密钥]
+   ```
+
+6. 有关更多信息和其他选项，请参阅 [memorypipeline](../memorypipeline/README.md)。
+
+## 向 WebApi 添加 OpenAI 插件
+
+您还可以添加将由 webapi 管理的 OpenAI 插件（而不是由 webapp 管理）。很快，所有 OpenAI 插件都将由 webapi 管理。
+
+> 默认情况下，已添加一个名为 [Klarna Shopping](https://www.klarna.com/international/press/klarna-brings-smoooth-shopping-to-chatgpt/) 的第三方 OpenAI 插件。
+
+请参阅[此处](../plugins/README.md)了解更多详细信息。
+
+## （可选）启用 Cosmos 聊天存储
+
+[Azure Cosmos DB](https://learn.microsoft.com/en-us/azure/cosmos-db/introduction) 可用作 Chat Copilot 的持久聊天存储。聊天存储用于存储聊天会话、参与者和消息。
+
+### 先决条件
+
+#### 1. 容器和分区键
+
+为了优化性能，每个容器必须使用特定的分区键创建：
+| 存储 | 容器名称 | 分区键 |
+| ----- | ------------- | ------------ |
+| 聊天会话 | chatsessions | /id（默认） |
+| 聊天消息 | chatmessages | /chatId |
+| 聊天内存源 | chatmemorysources | /chatId |
+| 聊天参与者 | chatparticipants | /userId |
+
+> 对于在[发布版本 0.3](https://github.com/microsoft/chat-copilot/releases/tag/0.3)之前使用 CosmosDB 的现有客户，我们建议删除现有的 Cosmos DB 容器并重新部署，以实现与分区架构相关的性能更新。要保留现有聊天，可以如[此处](https://learn.microsoft.com/en-us/azure/cosmos-db/intra-account-container-copy#copy-a-container)所述迁移容器。
+
+## （可选）启用 Qdrant 内存存储
+
+默认情况下，服务使用内存中的易失性内存存储，当服务停止或重启时，会忘记所有内存。
+[Qdrant](https://github.com/qdrant/qdrant) 是一个持久的可扩展向量搜索引擎，可以在容器中本地部署或[在云中大规模部署](https://github.com/Azure-Samples/qdrant-azure)。
+
+要启用 Qdrant 内存存储，您必须首先在本地部署 Qdrant，然后配置 Chat Copilot API 服务使用它。
+
+### 1. 配置您的环境
+
+在开始之前，请确保您具备以下额外要求：
+
+- 用于托管 [Qdrant](https://github.com/qdrant/qdrant) 向量搜索引擎的 [Docker Desktop](https://www.docker.com/products/docker-desktop)。
+
+### 2. 在本地部署 Qdrant VectorDB
+
+1. 打开终端并使用 Docker 拉取容器镜像。
+
+   ```bash
+   docker pull qdrant/qdrant
+   ```
+
+2. 切换到此存储库目录并创建 `./data/qdrant` 目录用作持久存储。
+   然后在端口 `6333` 上启动 Qdrant 容器，使用 `./data/qdrant` 文件夹作为持久存储位置。
+
+   ```bash
+   mkdir ./data/qdrant
+   docker run --name copilotchat -p 6333:6333 -v "$(pwd)/data/qdrant:/qdrant/storage" qdrant/qdrant
+   ```
+
+   > 要停止容器，在另一个终端窗口中运行 `docker container stop copilotchat; docker container rm copilotchat;`。
+
+## （可选）启用 Azure 认知搜索内存存储
+
+Azure 认知搜索可用作 Chat Copilot 的持久内存存储。
+该服务使用其[向量搜索](https://learn.microsoft.com/en-us/azure/search/vector-search-overview)功能。
+
+## （可选）启用 Application Insights 遥测
+
+在 CopilotChatApi 上启用遥测允许您捕获有关 API 请求和响应的数据，使您能够监控部署并监控应用程序的使用情况。
+
+要使用 Application Insights，首先在您的 Azure 订阅中创建一个可用于此目的的实例。
+
+在资源概述页面的右上角，使用复制按钮复制连接字符串，并将其粘贴到 `APPLICATIONINSIGHTS_CONNECTION_STRING` 设置中，作为 appsettings 值或将其添加为密钥。
+
+除此之外，还有一些自定义事件可以告诉您用户如何使用服务，例如 `PluginFunction`。
+
+访问这些自定义事件的建议方法是使用 Azure 数据资源管理器（ADX）。要在 ADX 中访问来自 Application Insights 的数据，请创建新仪表板并添加新数据源（使用右上角的省略号下拉菜单）。
+
+在集群 URI 中使用以下链接：`https://ade.applicationinsights.io/subscriptions/<您的订阅 ID>`。订阅 ID 显示在您的 Application Insights 实例的资源页面上。然后您可以为 Application Insights 资源选择数据库。
+
+有关更多信息，请参阅[使用 Azure 数据资源管理器查询 Azure Monitor 中的数据](https://learn.microsoft.com/en-us/azure/data-explorer/query-monitor-data)。
+
+CopilotChat 特定事件位于名为 `customEvents` 的表中。
+
+例如，要查看最近 100 次插件函数调用：
+
+```kql
+customEvents
+| where timestamp between (_startTime .. _endTime)
+| where name == "PluginFunction"
+| extend plugin = tostring(customDimensions.pluginName)
+| extend function = tostring(customDimensions.functionName)
+| extend success = tobool(customDimensions.success)
+| extend userId = tostring(customDimensions.userId)
+| extend environment = tostring(customDimensions.AspNetCoreEnvironment)
+| extend pluginFunction = strcat(plugin, '/', function)
+| project timestamp, pluginFunction, success, userId, environment
+| order by timestamp desc
+| limit 100
+```
+
+或者报告环境中插件函数的成功率，您可以首先向仪表板添加参数以过滤环境。
+
+您可以使用此查询通过将 `Source` 添加为此 `Query` 来显示可用环境：
+
+```kql
+customEvents
+| where timestamp between (['_startTime'] .. ['_endTime']) // 时间范围过滤
+| extend environment = tostring(customDimensions.AspNetCoreEnvironment)
+| distinct environment
+```
+
+将变量命名为 `_environment`，选择"多选"并勾选"添加空的'全选'值"。最后选择"全选"作为"默认值"。
+
+然后您可以使用此查询查询成功率：
+
+```kql
+customEvents
+| where timestamp between (_startTime .. _endTime)
+| where name == "PluginFunction"
+| extend plugin = tostring(customDimensions.pluginName)
+| extend function = tostring(customDimensions.functionName)
+| extend success = tobool(customDimensions.success)
+| extend environment = tostring(customDimensions.AspNetCoreEnvironment)
+| extend pluginFunction = strcat(plugin, '/', function)
+| summarize Total=count(), Success=countif(success) by pluginFunction, environment
+| project pluginFunction, SuccessPercentage = 100.0 * Success/Total, environment
+| order by SuccessPercentage asc
+```
+
+您可能希望使用可视化选项卡打开条件格式以突出显示低成功率或将其呈现为图表。
+
+最后，您可以使用如下查询随时间呈现此数据：
+
+```kql
+customEvents
+| where timestamp between (_startTime .. _endTime)
+| where name == "PluginFunction"
+| extend plugin = tostring(customDimensions.pluginName)
+| extend function = tostring(customDimensions.functionName)
+| extend success = tobool(customDimensions.success)
+| extend environment = tostring(customDimensions.AspNetCoreEnvironment)
+| extend pluginFunction = strcat(plugin, '/', function)
+| summarize Total=count(), Success=countif(success) by pluginFunction, environment, bin(timestamp,1m)
+| project pluginFunction, SuccessPercentage = 100.0 * Success/Total, environment, timestamp
+| order by timestamp asc
+```
+
+然后在可视化选项卡上使用时间图表。
+
+## （可选）自定义语义内核设置
+
+### 添加自定义插件
+
+> 尽管插件可以包含语义和本机函数，但由于导入限制，Chat Copilot 目前仅支持隔离类型的插件，因此您必须将插件分别分离到相应的文件夹中。
+
+如果您希望将自定义插件加载到内核中：
+
+1. 在 `./Plugins` 目录下创建两个新文件夹，分别命名为 `./SemanticPlugins` 和 `./NativePlugins`。在那里，您可以添加您的自定义插件（与插件同义）。
+2. 然后，在 `appsettings.json` 中注释掉相应的选项：
+
+   ```json
+   "Service": {
+      // "TimeoutLimitInS": "120"
+      "SemanticPluginsDirectory": "./Plugins/SemanticPlugins",
+      "NativePluginsDirectory": "./Plugins/NativePlugins"
+      // "KeyVault": ""
+      // "InMaintenance":  true
+   },
+   ```
+
+3. 如果您想将插件加载到核心聊天内核中，您必须将插件注册添加到 `SemanticKernelExtensions.cs` 的 `AddSemanticKernelServices` 方法中。取消注释带有 `services.AddKernelSetupHook` 的行并传入 `RegisterPluginsAsync` 钩子：
+
+   ```c#
+   internal static IServiceCollection AddSemanticKernelServices(this IServiceCollection services)
+   {
+      ...
+
+      // 为内核添加任何其他所需的设置。
+      // 取消注释以下行并传入您的自定义钩子。
+      builder.Services.AddKernelSetupHook(RegisterPluginsAsync);
+
+      return services;
+   }
+   ```
+
+#### 使用自定义插件部署
+
+如果您想使用 webapi 部署自定义插件，需要额外的配置。您有以下选项：
+
+1. **[推荐]** 创建自定义设置钩子以将您的插件导入内核。
+
+   > 默认的 `RegisterPluginsAsync` 函数使用反射从您的自定义插件文件导入本机函数。C# 反射是一种强大但缓慢的机制，在运行时动态检查和调用类型和方法。它适用于加载少量插件文件，但如果您有许多插件或复杂类型，它可能会降低性能并增加内存使用量。因此，我们建议创建您自己的导入函数来手动加载您的自定义插件。这样，您可以避免反射开销，并更好地控制如何以及何时加载插件。
+
+   创建一个函数在构建时加载您的自定义插件，并将该函数作为钩子传递给 `SemanticKernelExtensions.cs` 中的 `AddKernelSetupHook`。有关如何执行此操作的详细信息，请参阅[接下来的两个部分](#add-custom-setup-to-chat-copilots-kernel)。这绕过了在运行时加载插件的需要，因此无需为您的自定义插件发送源文件。记住在 `appsettings.json` 中注释掉 `NativePluginsDirectory` 或 `SemanticPluginsDirectory` 选项以防止任何潜在的路径错误。
+
+或者，
+
+2. 如果您想为自定义插件使用本地文件并且不介意暴露您的源代码，您需要确保在发布或运行应用程序时将文件复制到输出目录。部署的应用程序期望在由 `NativePluginsDirectory` 或 `SemanticPluginsDirectory` 选项指定的子目录中找到文件，默认情况下该目录相对于程序集位置。要将文件复制到输出目录，
+
+   在项目文件或文件属性中将文件和子目录标记为复制到输出目录。例如，如果您的文件位于名为 `Plugins\NativePlugins` 和 `Plugins\SemanticPlugins` 的子目录中，您可以在 `CopilotChatWebApi.csproj` 文件中取消注释以下行：
+
+   ```xml
+   <Content Include="Plugins\NativePlugins\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Plugins\SemanticPlugins\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+   ```
+
+3. 更改相应的目录选项以使用绝对路径或不同的基路径，但确保文件可从该位置访问。
+
+### 向 Chat Copilot 的内核添加自定义设置
+
+Chat Copilot 的语义内核可以通过使用执行内核任何补充设置的自定义钩子来自定义额外的插件或设置。自定义钩子是一个委托，它接受 `IServiceProvider` 和 `Kernel` 作为参数，并在内核上执行任何所需的操作，例如注册额外的插件、设置内核选项、添加依赖注入、导入数据等。要使用自定义钩子，您可以将其作为参数传递给 `SemanticKernelExtensions.cs` 的 `AddSemanticKernelServices` 方法中的 `AddKernelSetupHook` 调用。
+
+例如，以下代码片段显示如何创建注册名为 MyPlugin 的插件的自定义钩子并将其传递给 `AddKernelSetupHook`：
+
+```c#
+
+// 定义一个向内核注册 MyPlugin 的自定义钩子
+private static Task MyCustomSetupHook(IServiceProvider sp, Kernel kernel)
+{
+   // 将您的插件导入内核，名称为"MyPlugin"
+   kernel.ImportFunctions(new MyPlugin(), nameof(MyPlugin));
+
+   // 在内核上执行任何其他设置操作
+   // ...
+}
+
+```
+
+然后在 `SemanticKernelExtensions.cs` 的 `AddSemanticKernelServices` 方法中，将您的钩子传递到 `services.AddKernelSetupHook` 调用中：
+
+```c#
+
+internal static IServiceCollection AddSemanticKernelServices(this IServiceCollection services)
+{
+   ...
+
+   // 为内核添加任何其他所需的设置。
+   // 取消注释以下行并传入您的自定义钩子。
+   builder.Services.AddKernelSetupHook(MyCustomSetupHook);
+
+   return services;
+}
+
+```
