@@ -66,8 +66,16 @@ public static class TokenUtils
         if (result.Metadata is null ||
             !result.Metadata.TryGetValue("Usage", out object? usageObject) || usageObject is null)
         {
-            logger.LogError("No usage metadata provided");
+            // For APIs that don't provide usage metadata (like some DeepSeek responses), 
+            // estimate token usage from content length
+            if (result.ValueType == typeof(string) && result.GetValue<string>() is string content)
+            {
+                var estimatedTokens = TokenCount(content);
+                logger.LogDebug("No usage metadata provided, estimated {TokenCount} tokens from content", estimatedTokens);
+                return estimatedTokens.ToString(CultureInfo.InvariantCulture);
+            }
 
+            logger.LogDebug("No usage metadata provided and unable to estimate from content");
             return null;
         }
 
@@ -75,13 +83,55 @@ public static class TokenUtils
         try
         {
             var jsonObject = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(usageObject));
-            tokenUsage = jsonObject.GetProperty("TotalTokens").GetInt32();
-        }
-        catch (KeyNotFoundException)
-        {
-            logger.LogError("Usage details not found in model result.");
 
-            return null;
+            // Try different property names for different API formats
+            if (jsonObject.TryGetProperty("TotalTokens", out var totalTokensElement))
+            {
+                tokenUsage = totalTokensElement.GetInt32();
+            }
+            else if (jsonObject.TryGetProperty("total_tokens", out var totalTokensSnakeCase))
+            {
+                tokenUsage = totalTokensSnakeCase.GetInt32();
+            }
+            else if (jsonObject.TryGetProperty("PromptTokens", out var promptTokens) && 
+                     jsonObject.TryGetProperty("CompletionTokens", out var completionTokens))
+            {
+                tokenUsage = promptTokens.GetInt32() + completionTokens.GetInt32();
+            }
+            else if (jsonObject.TryGetProperty("prompt_tokens", out var promptTokensSnake) && 
+                     jsonObject.TryGetProperty("completion_tokens", out var completionTokensSnake))
+            {
+                tokenUsage = promptTokensSnake.GetInt32() + completionTokensSnake.GetInt32();
+            }
+            else
+            {
+                // If no recognized token usage format, estimate from content
+                if (result.ValueType == typeof(string) && result.GetValue<string>() is string content)
+                {
+                    tokenUsage = TokenCount(content);
+                    logger.LogDebug("Token usage format not recognized, estimated {TokenCount} tokens from content", tokenUsage);
+                }
+                else
+                {
+                    logger.LogDebug("Usage details not found in model result and unable to estimate from content");
+                    return null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug("Error parsing usage metadata: {Error}", ex.Message);
+            
+            // Fallback to content-based estimation
+            if (result.ValueType == typeof(string) && result.GetValue<string>() is string content)
+            {
+                tokenUsage = TokenCount(content);
+                logger.LogDebug("Fallback to content-based token estimation: {TokenCount} tokens", tokenUsage);
+            }
+            else
+            {
+                return null;
+            }
         }
 
         return tokenUsage.ToString(CultureInfo.InvariantCulture);

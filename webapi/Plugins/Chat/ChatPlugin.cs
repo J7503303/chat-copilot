@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 
 using System.ComponentModel;
 using System.Globalization;
@@ -392,7 +392,7 @@ public class ChatPlugin
         }
         else
         {
-            this._logger.LogError("Unable to determine token usage for audienceExtraction");
+            this._logger.LogDebug("Unable to determine token usage for audienceExtraction");
         }
 
         return $"List of participants: {result}";
@@ -438,7 +438,7 @@ public class ChatPlugin
         }
         else
         {
-            this._logger.LogError("Unable to determine token usage for userIntentExtraction");
+            this._logger.LogDebug("Unable to determine token usage for userIntentExtraction");
         }
 
         return $"User intent: {result}";

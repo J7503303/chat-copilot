@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 
 using System.Globalization;
 using CopilotChat.WebApi.Extensions;
@@ -103,7 +103,7 @@ internal static class SemanticChatMemoryExtractor
             }
             else
             {
-                logger.LogError("Unable to determine token usage for {0}", $"SystemCognitive_{memoryType}");
+                logger.LogDebug("Unable to determine token usage for {0}", $"SystemCognitive_{memoryType}");
             }
 
             SemanticChatMemory memory = SemanticChatMemory.FromJson(result.ToString());

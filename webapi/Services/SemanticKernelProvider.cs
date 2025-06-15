@@ -49,10 +49,25 @@ public sealed class SemanticKernelProvider
 
             case string x when x.Equals("OpenAI", StringComparison.OrdinalIgnoreCase):
                 var openAIOptions = memoryOptions.GetServiceConfig<OpenAIConfig>(configuration, "OpenAI");
-                builder.AddOpenAIChatCompletion(
-                    openAIOptions.TextModel,
-                    openAIOptions.APIKey,
-                    httpClient: httpClientFactory.CreateClient());
+                if (!string.IsNullOrEmpty(openAIOptions.Endpoint))
+                {
+                    // For custom endpoints (like Ollama), use the custom endpoint version
+#pragma warning disable SKEXP0010
+                    builder.AddOpenAIChatCompletion(
+                        modelId: openAIOptions.TextModel,
+                        endpoint: new Uri(openAIOptions.Endpoint),
+                        apiKey: openAIOptions.APIKey,
+                        httpClient: httpClientFactory.CreateClient());
+#pragma warning restore SKEXP0010
+                }
+                else
+                {
+                    // For standard OpenAI, use the standard version
+                    builder.AddOpenAIChatCompletion(
+                        openAIOptions.TextModel,
+                        openAIOptions.APIKey,
+                        httpClient: httpClientFactory.CreateClient());
+                }
 #pragma warning restore CA2000
                 break;
 
