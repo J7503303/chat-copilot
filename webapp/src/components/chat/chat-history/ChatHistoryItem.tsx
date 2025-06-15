@@ -172,7 +172,7 @@ export const ChatHistoryItem: React.FC<ChatHistoryItemProps> = ({ message, messa
             data-username={fullName}
             data-content={utils.formatChatTextContent(message.content)}
         >
-            {
+            {!isMe && (
                 <Persona
                     className={classes.persona}
                     avatar={avatar}
@@ -182,7 +182,7 @@ export const ChatHistoryItem: React.FC<ChatHistoryItemProps> = ({ message, messa
                             : undefined
                     }
                 />
-            }
+            )}
             <div className={isMe ? mergeClasses(classes.item, classes.me) : classes.item}>
                 <div className={classes.header}>
                     {!isMe && <Text weight="semibold">{fullName}</Text>}
@@ -227,6 +227,17 @@ export const ChatHistoryItem: React.FC<ChatHistoryItemProps> = ({ message, messa
                     </div>
                 )}
             </div>
+            {isMe && (
+                <Persona
+                    className={classes.persona}
+                    avatar={avatar}
+                    presence={
+                        !features[FeatureKeys.SimplifiedExperience].enabled && !isMe
+                            ? { status: 'available' }
+                            : undefined
+                    }
+                />
+            )}
             {features[FeatureKeys.RLHF].enabled && message.userFeedback === UserFeedback.Positive && (
                 <ThumbLikeFilled color="gray" />
             )}
