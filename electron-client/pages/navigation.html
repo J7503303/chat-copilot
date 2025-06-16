@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医疗AI助手 - 导航栏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        .header {
+            background: #0078d4;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .expand-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .expand-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Tab导航 */
+        .tab-container {
+            background: white;
+            border-bottom: 1px solid #e1e1e1;
+            padding: 0 20px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .tab-list {
+            display: flex;
+            gap: 0;
+            flex: 1;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab:hover {
+            background: #f8f9fa;
+            color: #0078d4;
+        }
+
+        .tab.active {
+            color: #0078d4;
+            border-bottom-color: #0078d4;
+            font-weight: 600;
+        }
+
+        .tab-icon {
+            font-size: 16px;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .quick-action {
+            padding: 8px 12px;
+            border: 1px solid #e1e1e1;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .quick-action:hover {
+            background: #f0f8ff;
+            border-color: #0078d4;
+            color: #0078d4;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="header">
+        <h1>🏥 医疗AI助手</h1>
+        <div class="user-info">
+            <span>张医生</span>
+            <button class="expand-btn" onclick="expandWindow()">展开窗口</button>
+            <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                👨‍⚕️
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab导航 -->
+    <div class="tab-container">
+        <div class="tab-list">
+            <button class="tab active" onclick="switchTab('chat')" data-tab="chat">
+                <span class="tab-icon">💬</span>
+                <span>智能问诊</span>
+            </button>
+            <button class="tab" onclick="switchTab('diagnosis')" data-tab="diagnosis">
+                <span class="tab-icon">🔍</span>
+                <span>病情分析</span>
+            </button>
+            <button class="tab" onclick="switchTab('report')" data-tab="report">
+                <span class="tab-icon">📋</span>
+                <span>检验解读</span>
+            </button>
+            <button class="tab" onclick="switchTab('record')" data-tab="record">
+                <span class="tab-icon">📝</span>
+                <span>病历生成</span>
+            </button>
+            <button class="tab" onclick="switchTab('quality')" data-tab="quality">
+                <span class="tab-icon">✅</span>
+                <span>病历质控</span>
+            </button>
+            <button class="tab" onclick="switchTab('documents')" data-tab="documents">
+                <span class="tab-icon">📁</span>
+                <span>文档管理</span>
+            </button>
+        </div>
+        
+        <div class="quick-actions">
+            <button class="quick-action" onclick="quickAction('newPatient')">
+                <span>👤</span>
+                <span>新患者</span>
+            </button>
+            <button class="quick-action" onclick="quickAction('emergency')">
+                <span>🚨</span>
+                <span>急诊</span>
+            </button>
+            <button class="quick-action" onclick="quickAction('settings')">
+                <span>⚙️</span>
+                <span>设置</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Tab切换功能
+        function switchTab(tabName) {
+            // 更新UI状态
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            
+            // 通知客户端切换Tab
+            if (window.electronAPI) {
+                window.electronAPI.switchTab(tabName);
+            } else if (window.wpfHost) {
+                window.wpfHost.SwitchTab(tabName);
+            }
+            
+            console.log(`切换到Tab: ${tabName}`);
+        }
+
+        // 展开窗口
+        function expandWindow() {
+            if (window.electronAPI) {
+                window.electronAPI.toggleCompactMode();
+            } else if (window.wpfHost) {
+                window.wpfHost.ToggleCompactMode();
+            }
+        }
+
+        // 快速操作
+        function quickAction(action) {
+            if (window.electronAPI) {
+                window.electronAPI.quickAction(action);
+            } else if (window.wpfHost) {
+                window.wpfHost.QuickAction(action);
+            }
+            
+            console.log(`快速操作: ${action}`);
+        }
+
+        // 第三方系统调用接口
+        window.MedicalAI = {
+            switchToTab: function(tabName) {
+                switchTab(tabName);
+                return { success: true, currentTab: tabName };
+            },
+            
+            getCurrentTab: function() {
+                const activeTab = document.querySelector('.tab.active');
+                return activeTab ? activeTab.dataset.tab : null;
+            },
+            
+            expandWindow: function() {
+                expandWindow();
+                return { success: true, action: 'expand' };
+            }
+        };
+
+        // 监听来自客户端的消息
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'switchTab') {
+                switchTab(event.data.tabName);
+            }
+        });
+
+        console.log('导航栏页面已加载，可用接口:');
+        console.log('- MedicalAI.switchToTab(tabName)');
+        console.log('- MedicalAI.getCurrentTab()');
+        console.log('- MedicalAI.expandWindow()');
+    </script>
+</body>
+</html> 

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>病情分析</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #0078d4;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .compact-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .feature-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .feature-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #323130;
+            margin-bottom: 16px;
+        }
+
+        .feature-description {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .feature-list {
+            text-align: left;
+            margin-bottom: 30px;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #555;
+        }
+
+        .action-btn {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #106ebe;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 病情分析</h1>
+        <button class="compact-btn" onclick="compactMode()">紧凑模式</button>
+    </div>
+
+    <div class="main-content">
+        <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <h2 class="feature-title">智能病情分析</h2>
+            <p class="feature-description">
+                基于症状、检查结果和病史信息，运用AI技术进行综合分析，提供专业的诊断建议和治疗方案。
+            </p>
+            
+            <ul class="feature-list">
+                <li>🎯 症状关联分析</li>
+                <li>📊 检验结果解读</li>
+                <li>🔬 鉴别诊断建议</li>
+                <li>💊 治疗方案推荐</li>
+                <li>⚠️ 风险评估预警</li>
+            </ul>
+            
+            <button class="action-btn" onclick="startAnalysis()">开始分析</button>
+        </div>
+    </div>
+
+    <script>
+        function compactMode() {
+            if (window.electronAPI) {
+                window.electronAPI.toggleCompactMode();
+            }
+        }
+
+        function startAnalysis() {
+            alert('病情分析功能开发中...');
+        }
+
+        console.log('病情分析页面已加载');
+    </script>
+</body>
+</html> 

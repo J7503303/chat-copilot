@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医疗AI助手 - 界面原型</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        .header {
+            background: #0078d4;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Tab导航 */
+        .tab-container {
+            background: white;
+            border-bottom: 1px solid #e1e1e1;
+            padding: 0 20px;
+        }
+
+        .tab-list {
+            display: flex;
+            gap: 0;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: #f8f9fa;
+            color: #0078d4;
+        }
+
+        .tab.active {
+            color: #0078d4;
+            border-bottom-color: #0078d4;
+            font-weight: 600;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            background: white;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 280px;
+            background: #fafafa;
+            border-right: 1px solid #e1e1e1;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .sidebar.collapsed {
+            width: 60px;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #e1e1e1;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .collapse-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #e1e1e1;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .collapse-btn:hover {
+            background: #f0f8ff;
+            border-color: #0078d4;
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            color: #323130;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar.collapsed .sidebar-title {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            transition: padding 0.3s ease;
+        }
+
+        .sidebar.collapsed .sidebar-content {
+            padding: 16px 8px;
+        }
+
+        /* 快速操作按钮 */
+        .quick-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .quick-action-btn {
+            padding: 12px 16px;
+            border: 1px solid #e1e1e1;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .quick-action-btn {
+            padding: 12px 8px;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .quick-action-btn .btn-text {
+            display: none;
+        }
+
+        .quick-action-btn:hover {
+            background: #f0f8ff;
+            border-color: #0078d4;
+        }
+
+        .quick-action-btn.active {
+            background: #e6f3ff;
+            border-color: #0078d4;
+            color: #0078d4;
+        }
+
+        /* 患者信息卡片 */
+        .patient-card {
+            background: white;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed .patient-card {
+            padding: 8px;
+            text-align: center;
+        }
+
+        .patient-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #323130;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed .patient-name {
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .patient-info {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar.collapsed .patient-info {
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        /* 聊天区域 */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e1e1e1;
+            background: #fafafa;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title {
+            font-weight: 600;
+            color: #323130;
+        }
+
+        .chat-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        /* 消息区域 */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .message-avatar.ai {
+            background: #0078d4;
+        }
+
+        .message-avatar.user {
+            background: #10b981;
+        }
+
+        .message-content {
+            background: white;
+            border: 1px solid #e1e1e1;
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .message.user .message-content {
+            background: #0078d4;
+            color: white;
+            border-color: #0078d4;
+        }
+
+        /* 医疗专用消息样式 */
+        .medical-result {
+            background: #f0f8ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+
+        .medical-result-header {
+            font-weight: 600;
+            color: #0078d4;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .medical-result-content {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* 输入区域 */
+        .input-area {
+            padding: 16px 20px;
+            border-top: 1px solid #e1e1e1;
+            background: white;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-field {
+            flex: 1;
+            min-height: 40px;
+            max-height: 120px;
+            padding: 10px 16px;
+            border: 1px solid #e1e1e1;
+            border-radius: 20px;
+            resize: none;
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: #0078d4;
+        }
+
+        .send-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: #0078d4;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #106ebe;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            border: 1px solid #e1e1e1;
+            background: white;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toolbar-btn:hover {
+            background: #f0f8ff;
+            border-color: #0078d4;
+            color: #0078d4;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            
+            .main-content {
+                flex-direction: column;
+            }
+        }
+
+        /* 隐藏非活动tab内容 */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex: 1;
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: relative;
+        }
+
+        .sidebar.collapsed .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #323130;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-left: 8px;
+        }
+
+        .sidebar.collapsed .tooltip:hover::before {
+            content: '';
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-right-color: #323130;
+            z-index: 1000;
+            margin-left: 2px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="header">
+        <h1>🏥 医疗AI助手</h1>
+        <div class="user-info">
+            <span>张医生</span>
+            <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                👨‍⚕️
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab导航 -->
+    <div class="tab-container">
+        <div class="tab-list">
+            <button class="tab active" onclick="switchTab('chat')">💬 智能问诊</button>
+            <button class="tab" onclick="switchTab('diagnosis')">🔍 病情分析</button>
+            <button class="tab" onclick="switchTab('report')">📋 检验解读</button>
+            <button class="tab" onclick="switchTab('record')">📝 病历生成</button>
+            <button class="tab" onclick="switchTab('quality')">✅ 病历质控</button>
+            <button class="tab" onclick="switchTab('documents')">📁 文档管理</button>
+        </div>
+    </div>
+
+    <!-- 主内容区域 -->
+    <div class="main-content">
+        <!-- 智能问诊Tab -->
+        <div id="chat" class="tab-content active">
+            <!-- 侧边栏 -->
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h3 class="sidebar-title">快速操作</h3>
+                    <button class="collapse-btn" onclick="toggleSidebar()" title="折叠/展开">
+                        <span id="collapse-icon">◀</span>
+                    </button>
+                </div>
+                <div class="sidebar-content">
+                    <div class="quick-actions">
+                        <button class="quick-action-btn active tooltip" data-tooltip="开始问诊">
+                            <span>💬</span>
+                            <span class="btn-text">开始问诊</span>
+                        </button>
+                        <button class="quick-action-btn tooltip" data-tooltip="症状记录">
+                            <span>📋</span>
+                            <span class="btn-text">症状记录</span>
+                        </button>
+                        <button class="quick-action-btn tooltip" data-tooltip="辅助诊断">
+                            <span>🔍</span>
+                            <span class="btn-text">辅助诊断</span>
+                        </button>
+                        <button class="quick-action-btn tooltip" data-tooltip="用药建议">
+                            <span>💊</span>
+                            <span class="btn-text">用药建议</span>
+                        </button>
+                        <button class="quick-action-btn tooltip" data-tooltip="随访计划">
+                            <span>📅</span>
+                            <span class="btn-text">随访计划</span>
+                        </button>
+                    </div>
+
+                    <div class="patient-card">
+                        <div class="patient-name">李小明</div>
+                        <div class="patient-info">
+                            性别：男<br>
+                            年龄：35岁<br>
+                            病历号：H2024001<br>
+                            科室：内科<br>
+                            主诉：胸闷气短3天
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 聊天区域 -->
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title">智能问诊 - 李小明</div>
+                    <div class="chat-status">
+                        <div class="status-dot"></div>
+                        <span>AI助手在线</span>
+                    </div>
+                </div>
+
+                <div class="messages-container">
+                    <div class="message">
+                        <div class="message-avatar ai">AI</div>
+                        <div class="message-content">
+                            您好！我是您的医疗AI助手。我看到患者李小明的主诉是"胸闷气短3天"，让我来协助您进行详细的问诊。
+
+                            <div class="medical-result">
+                                <div class="medical-result-header">
+                                    🎯 建议问诊要点
+                                </div>
+                                <div class="medical-result-content">
+                                    1. 胸闷气短的具体表现和诱发因素<br>
+                                    2. 是否伴有胸痛、心悸等症状<br>
+                                    3. 既往心肺疾病史<br>
+                                    4. 近期活动耐量变化<br>
+                                    5. 用药史和过敏史
+                                </div>
+                            </div>
+
+                            请问您希望从哪个方面开始详细了解？
+                        </div>
+                    </div>
+
+                    <div class="message user">
+                        <div class="message-avatar user">张</div>
+                        <div class="message-content">
+                            请帮我分析一下胸闷气短的可能原因，并给出进一步检查建议
+                        </div>
+                    </div>
+
+                    <div class="message">
+                        <div class="message-avatar ai">AI</div>
+                        <div class="message-content">
+                            基于35岁男性患者"胸闷气短3天"的症状，我来为您分析可能的原因：
+
+                            <div class="medical-result">
+                                <div class="medical-result-header">
+                                    🔍 鉴别诊断分析
+                                </div>
+                                <div class="medical-result-content">
+                                    <strong>高可能性：</strong><br>
+                                    • 急性心肌梗死/不稳定心绞痛<br>
+                                    • 肺栓塞<br>
+                                    • 急性心力衰竭<br><br>
+                                    
+                                    <strong>中等可能性：</strong><br>
+                                    • 心律失常<br>
+                                    • 肺炎/胸膜炎<br>
+                                    • 气胸<br><br>
+                                    
+                                    <strong>需排除：</strong><br>
+                                    • 主动脉夹层<br>
+                                    • 心包炎<br>
+                                    • 焦虑症
+                                </div>
+                            </div>
+
+                            <div class="medical-result">
+                                <div class="medical-result-header">
+                                    📋 建议检查项目
+                                </div>
+                                <div class="medical-result-content">
+                                    <strong>紧急检查：</strong><br>
+                                    • 心电图（立即）<br>
+                                    • 胸部X线片<br>
+                                    • 心肌酶谱+肌钙蛋白<br>
+                                    • D-二聚体<br>
+                                    • 血气分析<br><br>
+                                    
+                                    <strong>进一步检查：</strong><br>
+                                    • 超声心动图<br>
+                                    • 胸部CT（必要时）<br>
+                                    • BNP/NT-proBNP
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <div class="input-container">
+                        <textarea class="input-field" placeholder="输入您的问题或指令..." rows="1"></textarea>
+                        <button class="send-btn">
+                            ➤
+                        </button>
+                    </div>
+                    <div class="toolbar">
+                        <button class="toolbar-btn">📋 生成病历</button>
+                        <button class="toolbar-btn">🔍 查看检查</button>
+                        <button class="toolbar-btn">💊 用药指导</button>
+                        <button class="toolbar-btn">📊 风险评估</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 其他Tab内容（简化显示） -->
+        <div id="diagnosis" class="tab-content">
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title">🔍 病情分析</div>
+                </div>
+                <div class="messages-container">
+                    <div style="text-align: center; color: #666; margin-top: 100px;">
+                        <h3>病情分析功能</h3>
+                        <p>基于症状、检查结果进行智能分析</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="report" class="tab-content">
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title">📋 检验解读</div>
+                </div>
+                <div class="messages-container">
+                    <div style="text-align: center; color: #666; margin-top: 100px;">
+                        <h3>检验报告解读</h3>
+                        <p>智能解读各类检验检查报告</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="record" class="tab-content">
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title">📝 病历生成</div>
+                </div>
+                <div class="messages-container">
+                    <div style="text-align: center; color: #666; margin-top: 100px;">
+                        <h3>智能病历生成</h3>
+                        <p>基于问诊内容自动生成规范病历</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="quality" class="tab-content">
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title">✅ 病历质控</div>
+                </div>
+                <div class="messages-container">
+                    <div style="text-align: center; color: #666; margin-top: 100px;">
+                        <h3>病历质量控制</h3>
+                        <p>检查病历完整性和规范性</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="documents" class="tab-content">
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title">📁 文档管理</div>
+                </div>
+                <div class="messages-container">
+                    <div style="text-align: center; color: #666; margin-top: 100px;">
+                        <h3>医疗文档管理</h3>
+                        <p>上传和管理医疗相关文档</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab切换功能
+        function switchTab(tabName) {
+            // 移除所有active类
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // 添加active类到当前tab
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            // 触发tab切换事件（供第三方系统调用）
+            window.dispatchEvent(new CustomEvent('tabChanged', { 
+                detail: { tabName, timestamp: Date.now() } 
+            }));
+        }
+
+        // 侧边栏折叠/展开功能
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const icon = document.getElementById('collapse-icon');
+            
+            sidebar.classList.toggle('collapsed');
+            icon.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+            
+            // 保存折叠状态到localStorage
+            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+        }
+
+        // 页面加载时恢复侧边栏状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isCollapsed) {
+                document.getElementById('sidebar').classList.add('collapsed');
+                document.getElementById('collapse-icon').textContent = '▶';
+            }
+        });
+
+        // 第三方系统调用接口
+        window.MedicalAI = {
+            // 切换到指定Tab
+            switchToTab: function(tabName, params = {}) {
+                const tabButton = document.querySelector(`[onclick="switchTab('${tabName}')"]`);
+                if (tabButton) {
+                    tabButton.click();
+                    // 传递参数给当前Tab
+                    if (Object.keys(params).length > 0) {
+                        window.dispatchEvent(new CustomEvent('tabParams', { 
+                            detail: { tabName, params } 
+                        }));
+                    }
+                    return { success: true, message: `已切换到${tabName}` };
+                } else {
+                    return { success: false, message: `Tab ${tabName} 不存在` };
+                }
+            },
+            
+            // 获取当前活动Tab
+            getCurrentTab: function() {
+                const activeTab = document.querySelector('.tab.active');
+                return activeTab ? activeTab.textContent.trim() : null;
+            },
+            
+            // 折叠/展开侧边栏
+            toggleSidebar: function(collapsed = null) {
+                const sidebar = document.getElementById('sidebar');
+                const isCurrentlyCollapsed = sidebar.classList.contains('collapsed');
+                
+                if (collapsed === null) {
+                    toggleSidebar();
+                } else if (collapsed && !isCurrentlyCollapsed) {
+                    toggleSidebar();
+                } else if (!collapsed && isCurrentlyCollapsed) {
+                    toggleSidebar();
+                }
+                
+                return { 
+                    success: true, 
+                    collapsed: sidebar.classList.contains('collapsed') 
+                };
+            },
+            
+            // 发送消息到当前Tab
+            sendMessage: function(message, tabName = null) {
+                if (tabName) {
+                    this.switchToTab(tabName);
+                }
+                
+                const input = document.querySelector('.input-field');
+                if (input) {
+                    input.value = message;
+                    document.querySelector('.send-btn').click();
+                    return { success: true, message: '消息已发送' };
+                }
+                return { success: false, message: '输入框不可用' };
+            },
+            
+            // 触发Tab事件
+            triggerTabEvent: function(eventName, data = {}) {
+                window.dispatchEvent(new CustomEvent('medicalAIEvent', {
+                    detail: { eventName, data, timestamp: Date.now() }
+                }));
+                return { success: true, eventName, data };
+            }
+        };
+
+        // 模拟本地HTTP服务（实际应用中需要真实的HTTP服务器）
+        if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+            console.log('医疗AI助手接口已就绪');
+            console.log('可用接口:');
+            console.log('- MedicalAI.switchToTab(tabName, params)');
+            console.log('- MedicalAI.getCurrentTab()');
+            console.log('- MedicalAI.toggleSidebar(collapsed)');
+            console.log('- MedicalAI.sendMessage(message, tabName)');
+            console.log('- MedicalAI.triggerTabEvent(eventName, data)');
+        }
+
+        // 自动调整textarea高度
+        document.querySelector('.input-field').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // 发送消息功能（演示）
+        document.querySelector('.send-btn').addEventListener('click', function() {
+            const input = document.querySelector('.input-field');
+            if (input.value.trim()) {
+                // 这里可以添加发送消息的逻辑
+                console.log('发送消息:', input.value);
+                
+                // 模拟AI回复（演示用）
+                setTimeout(() => {
+                    addMessage('ai', '收到您的消息：' + input.value);
+                }, 1000);
+                
+                addMessage('user', input.value);
+                input.value = '';
+                input.style.height = 'auto';
+            }
+        });
+
+        // 回车发送消息
+        document.querySelector('.input-field').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.querySelector('.send-btn').click();
+            }
+        });
+
+        // 添加消息到聊天区域
+        function addMessage(type, content) {
+            const messagesContainer = document.querySelector('.messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const avatar = type === 'ai' ? 'AI' : '张';
+            const avatarClass = type === 'ai' ? 'ai' : 'user';
+            
+            messageDiv.innerHTML = `
+                <div class="message-avatar ${avatarClass}">${avatar}</div>
+                <div class="message-content">${content}</div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 监听Tab参数事件
+        window.addEventListener('tabParams', function(e) {
+            console.log('Tab参数:', e.detail);
+            // 这里可以根据不同Tab处理传入的参数
+        });
+
+        // 监听医疗AI事件
+        window.addEventListener('medicalAIEvent', function(e) {
+            console.log('医疗AI事件:', e.detail);
+            // 这里可以处理各种自定义事件
+        });
+    </script>
+</body>
+</html> 

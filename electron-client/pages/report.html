@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检验解读</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #0078d4;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .compact-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .feature-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .feature-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #323130;
+            margin-bottom: 16px;
+        }
+
+        .feature-description {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .feature-list {
+            text-align: left;
+            margin-bottom: 30px;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #555;
+        }
+
+        .action-btn {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #106ebe;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 检验解读</h1>
+        <button class="compact-btn" onclick="compactMode()">紧凑模式</button>
+    </div>
+
+    <div class="main-content">
+        <div class="feature-card">
+            <div class="feature-icon">📋</div>
+            <h2 class="feature-title">智能检验解读</h2>
+            <p class="feature-description">
+                自动解读各类检验检查报告，包括血常规、生化、影像学等，提供专业的结果分析和临床意义解释。
+            </p>
+            
+            <ul class="feature-list">
+                <li>🩸 血液检验分析</li>
+                <li>🧪 生化指标解读</li>
+                <li>🫀 心电图分析</li>
+                <li>🫁 影像学报告</li>
+                <li>📈 趋势变化监测</li>
+            </ul>
+            
+            <button class="action-btn" onclick="uploadReport()">上传报告</button>
+        </div>
+    </div>
+
+    <script>
+        function compactMode() {
+            if (window.electronAPI) {
+                window.electronAPI.toggleCompactMode();
+            }
+        }
+
+        function uploadReport() {
+            alert('检验解读功能开发中...');
+        }
+
+        console.log('检验解读页面已加载');
+    </script>
+</body>
+</html> 

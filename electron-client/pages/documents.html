@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; height: 100vh; display: flex; flex-direction: column; }
+        .header { background: #0078d4; color: white; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .compact-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .main-content { flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .feature-card { background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 600px; }
+        .feature-icon { font-size: 64px; margin-bottom: 20px; }
+        .feature-title { font-size: 24px; font-weight: 600; color: #323130; margin-bottom: 16px; }
+        .feature-description { font-size: 16px; color: #666; line-height: 1.6; margin-bottom: 30px; }
+        .feature-list { text-align: left; margin-bottom: 30px; }
+        .feature-list li { padding: 8px 0; color: #555; }
+        .action-btn { background: #0078d4; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+        .action-btn:hover { background: #106ebe; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📁 文档管理</h1>
+        <button class="compact-btn" onclick="compactMode()">紧凑模式</button>
+    </div>
+    <div class="main-content">
+        <div class="feature-card">
+            <div class="feature-icon">📁</div>
+            <h2 class="feature-title">医疗文档管理</h2>
+            <p class="feature-description">统一管理各类医疗文档，支持文档上传、分类、检索和共享，构建完整的医疗信息档案。</p>
+            <ul class="feature-list">
+                <li>📄 文档上传存储</li>
+                <li>🏷️ 智能分类标签</li>
+                <li>🔍 快速检索查找</li>
+                <li>🔗 文档关联分析</li>
+                <li>📤 安全共享传输</li>
+            </ul>
+            <button class="action-btn" onclick="manageDocuments()">管理文档</button>
+        </div>
+    </div>
+    <script>
+        function compactMode() { if (window.electronAPI) { window.electronAPI.toggleCompactMode(); } }
+        function manageDocuments() { alert('文档管理功能开发中...'); }
+        console.log('文档管理页面已加载');
+    </script>
+</body>
+</html> 
