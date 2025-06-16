@@ -19,7 +19,6 @@
             cursor: pointer;
             user-select: none;
             -webkit-user-select: none;
-            /* 移除 -webkit-app-region: drag 以允许鼠标事件 */
             margin: 0;
             padding: 0;
             display: flex;
@@ -42,7 +41,6 @@
             justify-content: center;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
-            /* 移除 -webkit-app-region: drag 以允许鼠标事件 */
             filter: drop-shadow(0 4px 12px rgba(0, 120, 212, 0.25)) 
                     drop-shadow(0 2px 6px rgba(0, 0, 0, 0.1));
         }
@@ -146,7 +144,7 @@
             top: 50%;
             transform: translateY(-50%);
             z-index: 0;
-            /*box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);*/
+
         }
 
         .robot-ear.left {
@@ -187,12 +185,6 @@
             animation: lookAround 4s infinite;
         }
 
-
-
-
-
-
-
         /* 动画 */
         @keyframes shine {
             0% { 
@@ -232,11 +224,6 @@
             }
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.8; }
-        }
-
         @keyframes radarPulse {
             0% {
                 transform: translate(-50%, -50%) scale(0.2);
@@ -252,12 +239,6 @@
                 transform: translate(-50%, -50%) scale(5);
                 opacity: 0;
             }
-        }
-
-        /* 拖拽时的样式 */
-        body.dragging .floating-icon {
-            transform: scale(1.05);
-            box-shadow: 0 8px 24px rgba(0, 120, 212, 0.4);
         }
     </style>
 </head>
@@ -276,39 +257,31 @@
                 </div>
             </div>
         </div>
-        
     </div>
 
     <script>
         const floatingIcon = document.getElementById('floatingIcon');
         let clickTimeout = null;
 
-        // 右键菜单禁用
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
+        // 禁用右键菜单和文本选择
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('selectstart', e => e.preventDefault());
 
-        // 单击事件 - 不执行任何操作
+        // 单击事件处理（防止双击时的干扰）
         floatingIcon.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            // 防止双击时触发单击
             if (clickTimeout) {
                 clearTimeout(clickTimeout);
                 clickTimeout = null;
                 return;
             }
             
-            // 单击不执行任何操作，只是防止双击时的干扰
-            clickTimeout = setTimeout(() => {
-                clickTimeout = null;
-                // 单击不做任何事情
-            }, 200);
+            clickTimeout = setTimeout(() => clickTimeout = null, 200);
         });
 
-        // 双击事件 - 切换主窗口显示状态
+        // 双击事件 - 显示主窗口
         floatingIcon.addEventListener('dblclick', function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -318,65 +291,54 @@
                 clickTimeout = null;
             }
             
-            // 双击切换主窗口显示状态
             toggleMainWindow();
         });
 
-        // 自定义拖动实现 - 不影响点击功能
-        let isDragging = false;
-        let dragStartX = 0;
-        let dragStartY = 0;
-        let windowStartX = 0;
-        let windowStartY = 0;
-        let hasMoved = false;
+        // 拖动功能变量
+        let isDragging = false, dragStartX = 0, dragStartY = 0;
+        let windowStartX = 0, windowStartY = 0, hasMoved = false;
 
-        // 鼠标按下事件，开始拖动
+        // 开始拖动
         floatingIcon.addEventListener('mousedown', function(e) {
-            if (e.button === 0) { // 左键
+            if (e.button === 0) {
                 isDragging = true;
                 hasMoved = false;
                 dragStartX = e.screenX;
                 dragStartY = e.screenY;
                 
-                // 获取当前窗口位置
-                if (window.electronAPI && window.electronAPI.getWindowPosition) {
+                if (window.electronAPI?.getWindowPosition) {
                     window.electronAPI.getWindowPosition().then(pos => {
                         if (pos.success) {
                             windowStartX = pos.x;
                             windowStartY = pos.y;
                         }
-                    }).catch(err => {
-                        console.error('获取窗口位置失败:', err);
-                    });
+                    }).catch(err => console.error('获取窗口位置失败:', err));
                 }
             }
         });
 
+        // 拖动过程
         document.addEventListener('mousemove', function(e) {
             if (isDragging) {
                 const deltaX = e.screenX - dragStartX;
                 const deltaY = e.screenY - dragStartY;
                 
-                // 如果移动距离超过阈值，认为是拖动
                 if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
                     hasMoved = true;
-                    
-                    const newX = windowStartX + deltaX;
-                    const newY = windowStartY + deltaY;
-                    
-                    if (window.electronAPI) {
-                        window.electronAPI.setFloatingPosition(newX, newY);
-                    }
+                    window.electronAPI?.setFloatingPosition(
+                        windowStartX + deltaX, 
+                        windowStartY + deltaY
+                    );
                 }
             }
         });
 
+        // 结束拖动
         document.addEventListener('mouseup', function(e) {
             if (isDragging && e.button === 0) {
                 isDragging = false;
                 
                 if (hasMoved) {
-                    // 如果发生了拖动，阻止点击事件
                     setTimeout(() => {
                         if (clickTimeout) {
                             clearTimeout(clickTimeout);
@@ -389,15 +351,11 @@
             }
         });
 
-        // 切换主窗口显示状态
+        // 显示主窗口
         function toggleMainWindow() {
-            if (window.electronAPI) {
-                window.electronAPI.showMainWindow().then(() => {
-                    // 主窗口显示成功
-                }).catch(err => {
-                    console.error('显示主窗口失败:', err);
-                });
-            }
+            window.electronAPI?.showMainWindow().catch(err => 
+                console.error('显示主窗口失败:', err)
+            );
         }
 
         // 更新状态指示器
@@ -419,14 +377,8 @@
             }
         }
 
-        // 监听来自主进程的状态更新
-        if (window.electronAPI) {
-            window.electronAPI.onStatusUpdate((status) => {
-                updateStatus(status);
-            });
-        }
-
-        // 初始化
+        // 初始化状态监听
+        window.electronAPI?.onStatusUpdate?.(updateStatus);
         updateStatus('online');
 
         // 第三方系统调用接口
@@ -447,14 +399,10 @@
             },
             
             setPosition: function(x, y) {
-                if (window.electronAPI) {
-                    window.electronAPI.setFloatingPosition(x, y);
-                }
+                window.electronAPI?.setFloatingPosition(x, y);
                 return { success: true, position: { x, y } };
             }
         };
-
-        // 悬浮图标初始化完成
     </script>
 </body>
 </html> 

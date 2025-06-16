@@ -74,20 +74,19 @@ function createFloatingWindow() {
             preload: path.join(__dirname, 'preload.js'),
             webSecurity: false
         },
-        frame: false, // 无边框
-        transparent: true, // 透明背景
-        alwaysOnTop: true, // 始终置顶
-        skipTaskbar: true, // 不在任务栏显示
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
         resizable: false,
         minimizable: false,
         maximizable: false,
         closable: false,
-        focusable: true, // 必须为true才能接收事件
-        acceptFirstMouse: true, // 允许第一次点击
+        focusable: true,
+        acceptFirstMouse: true,
         show: false,
         x: 100,
         y: 100,
-        // 关键：确保窗口可以接收鼠标事件
         type: process.platform === 'darwin' ? 'panel' : undefined,
         hasShadow: false,
         thickFrame: false
@@ -95,8 +94,6 @@ function createFloatingWindow() {
 
     // 加载悬浮图标页面
     floatingWindow.loadFile(path.join(__dirname, 'pages/floating-icon.html'));
-
-    // 生产环境不自动打开开发者工具
 
     // 悬浮窗口事件处理
     floatingWindow.on('closed', () => {
@@ -113,54 +110,11 @@ function createFloatingWindow() {
         return false;
     });
 
-    // 移除可能干扰鼠标事件的监听器
-
-    // 确保鼠标事件正常工作（用于拖动和点击）
-    floatingWindow.setIgnoreMouseEvents(false);
-    
-    // 确保窗口可以接收鼠标事件
+    // 窗口显示设置
     floatingWindow.once('ready-to-show', () => {
         floatingWindow.setIgnoreMouseEvents(false);
         floatingWindow.show();
-        
-        setTimeout(() => {
-            floatingWindow.focus();
-        }, 100);
-    });
-
-    // 窗口就绪后的设置
-    floatingWindow.webContents.once('dom-ready', () => {
-        // 注入CSS - 确保鼠标事件可用
-        floatingWindow.webContents.insertCSS(`
-            * {
-                -webkit-user-select: none !important;
-                user-select: none !important;
-                pointer-events: auto !important;
-            }
-            body {
-                pointer-events: auto !important;
-            }
-            .floating-icon {
-                cursor: move !important;
-                pointer-events: auto !important;
-            }
-        `);
-
-        // 注入基础事件处理
-        floatingWindow.webContents.executeJavaScript(`
-            // 禁用右键菜单
-            document.addEventListener('contextmenu', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }, false);
-            
-            // 禁用文本选择
-            document.addEventListener('selectstart', function(e) {
-                e.preventDefault();
-                return false;
-            }, false);
-        `);
+        setTimeout(() => floatingWindow.focus(), 100);
     });
 }
 
