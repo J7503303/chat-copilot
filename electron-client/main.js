@@ -240,8 +240,17 @@ function createTray() {
 // 显示主窗口
 function showWindow() {
     if (mainWindow) {
-        // 确保窗口尺寸适应当前屏幕
-        adjustWindowSize();
+        // 只在窗口首次显示或屏幕分辨率改变时调整窗口尺寸
+        const { screen } = require('electron');
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+        const windowHeight = screenHeight - 80;
+        const currentBounds = mainWindow.getBounds();
+
+        // 只有当屏幕尺寸变化时才调整窗口位置
+        if (currentBounds.height !== windowHeight) {
+            adjustWindowSize();
+        }
 
         mainWindow.show();
         mainWindow.focus();
@@ -318,8 +327,21 @@ function toggleCompactMode() {
 function switchTab(tabName) {
     currentTab = tabName;
 
-    // 确保窗口可见
-    showWindow();
+    // 确保窗口可见（但不重置位置）
+    if (mainWindow) {
+        if (!mainWindow.isVisible()) {
+            mainWindow.show();
+        }
+        mainWindow.focus();
+
+        // 如果窗口被最小化，恢复它
+        if (mainWindow.isMinimized()) {
+            mainWindow.restore();
+        }
+
+        // 隐藏悬浮窗口
+        hideFloatingWindow();
+    }
 
     // 向页面发送Tab切换消息
     if (mainWindow && mainWindow.webContents) {
