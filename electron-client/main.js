@@ -12,16 +12,26 @@ let httpServer;
 
 // 应用配置
 const APP_CONFIG = {
-    compactSize: { width: 1200, height: 120 },
-    fullSize: { width: 1200, height: 800 },
+    compactSize: { width: 60, height: 800 }, // 折叠时只显示导航栏
+    fullSize: { width: 540, height: 800 }, // 展开时显示完整界面
     httpPort: 3000
 };
 
 // 创建主窗口
 function createWindow() {
+    // 获取屏幕尺寸
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+    // 计算窗口高度（适应屏幕高度，留出一些边距）
+    const windowHeight = screenHeight - 80;
+
     mainWindow = new BrowserWindow({
         width: APP_CONFIG.fullSize.width,
-        height: APP_CONFIG.fullSize.height,
+        height: windowHeight,
+        x: screenWidth - APP_CONFIG.fullSize.width, // 贴右边显示
+        y: 40, // 距离顶部40px
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -29,28 +39,35 @@ function createWindow() {
         },
         icon: path.join(__dirname, 'assets/icon.png'),
         show: false, // 初始不显示，通过悬浮图标控制
-        frame: true,
-        resizable: true,
-        minimizable: true,
-        maximizable: true,
-        closable: true,
+        frame: false, // 去掉边框
+        resizable: false, // 固定大小
+        minimizable: true, // 允许最小化
+        maximizable: false,
+        closable: true, // 允许关闭
         alwaysOnTop: false,
-        skipTaskbar: false // 在任务栏显示
+        skipTaskbar: false, // 在任务栏显示
+        transparent: false,
+        titleBarStyle: 'hidden'
     });
 
     // 加载初始页面
     loadPage(currentTab);
 
+    // 监听控制台消息（应急方案）
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+        if (message.includes('🔥🔥🔥 MINIMIZE_WINDOW_NOW')) {
+            mainWindow.minimize();
+        }
+
+        if (message.includes('🔥🔥🔥 CLOSE_WINDOW_NOW')) {
+            mainWindow.hide();
+            showFloatingWindow();
+        }
+    });
+
     // 窗口事件处理
     mainWindow.on('closed', () => {
         mainWindow = null;
-    });
-
-    // 最小化时隐藏窗口，显示悬浮图标
-    mainWindow.on('minimize', (event) => {
-        event.preventDefault();
-        mainWindow.hide();
-        showFloatingWindow();
     });
 
     // 关闭窗口时隐藏到悬浮图标
@@ -122,12 +139,12 @@ function createFloatingWindow() {
 function createTray() {
     // 托盘图标路径
     const trayIconPath = path.join(__dirname, 'assets/tray-icon.png');
-    
+
     tray = new Tray(trayIconPath);
-    
+
     // 托盘提示文本
     tray.setToolTip('医疗AI助手 - 点击打开');
-    
+
     // 创建托盘菜单
     const contextMenu = Menu.buildFromTemplate([
         {
@@ -202,9 +219,9 @@ function createTray() {
             }
         }
     ]);
-    
+
     tray.setContextMenu(contextMenu);
-    
+
     // 单击托盘图标显示/隐藏窗口
     tray.on('click', () => {
         if (mainWindow.isVisible()) {
@@ -213,7 +230,7 @@ function createTray() {
             showWindow();
         }
     });
-    
+
     // 双击托盘图标切换紧凑模式
     tray.on('double-click', () => {
         toggleCompactMode();
@@ -223,16 +240,39 @@ function createTray() {
 // 显示主窗口
 function showWindow() {
     if (mainWindow) {
+        // 确保窗口尺寸适应当前屏幕
+        adjustWindowSize();
+
         mainWindow.show();
         mainWindow.focus();
-        
+
         // 如果窗口被最小化，恢复它
         if (mainWindow.isMinimized()) {
             mainWindow.restore();
         }
-        
+
         // 隐藏悬浮窗口
         hideFloatingWindow();
+    }
+}
+
+// 调整窗口尺寸以适应当前屏幕
+function adjustWindowSize() {
+    if (mainWindow) {
+        const { screen } = require('electron');
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+        const windowHeight = screenHeight - 80;
+
+        const currentBounds = mainWindow.getBounds();
+        const targetWidth = isCompactMode ? APP_CONFIG.compactSize.width : APP_CONFIG.fullSize.width;
+
+        mainWindow.setBounds({
+            x: screenWidth - targetWidth,
+            y: 40,
+            width: targetWidth,
+            height: windowHeight
+        });
     }
 }
 
@@ -240,12 +280,12 @@ function showWindow() {
 function showFloatingWindow() {
     if (floatingWindow) {
         floatingWindow.show();
-        
+
         // 获取屏幕尺寸，设置默认位置（右上角）
         const { screen } = require('electron');
         const primaryDisplay = screen.getPrimaryDisplay();
         const { width, height } = primaryDisplay.workAreaSize;
-        
+
         floatingWindow.setPosition(width - 120, 50);
     }
 }
@@ -259,102 +299,41 @@ function hideFloatingWindow() {
 
 // 加载页面
 function loadPage(tabName) {
-    let pagePath;
-    
-    if (isCompactMode) {
-        pagePath = path.join(__dirname, 'pages/navigation.html');
-    } else {
-        switch (tabName) {
-            case 'chat':
-                pagePath = path.join(__dirname, 'pages/chat-page.html');
-                break;
-            case 'diagnosis':
-                pagePath = path.join(__dirname, 'pages/diagnosis.html');
-                break;
-            case 'report':
-                pagePath = path.join(__dirname, 'pages/report.html');
-                break;
-            case 'record':
-                pagePath = path.join(__dirname, 'pages/record.html');
-                break;
-            case 'quality':
-                pagePath = path.join(__dirname, 'pages/quality.html');
-                break;
-            case 'documents':
-                pagePath = path.join(__dirname, 'pages/documents.html');
-                break;
-            default:
-                pagePath = path.join(__dirname, 'pages/chat-page.html');
-        }
-    }
-    
+    // 始终使用新的主界面布局
+    const pagePath = path.join(__dirname, 'pages/main-layout.html');
     mainWindow.loadFile(pagePath);
     currentTab = tabName;
 }
 
-// 切换紧凑模式
+// 切换紧凑模式（现在通过toggle-sidebar IPC处理，这里保留兼容性）
 function toggleCompactMode() {
-    isCompactMode = !isCompactMode;
-    
-    if (isCompactMode) {
-        // 切换到紧凑模式
-        mainWindow.setSize(APP_CONFIG.compactSize.width, APP_CONFIG.compactSize.height);
-        mainWindow.setResizable(false);
-        loadPage('navigation');
-        
-        // 更新托盘菜单
-        updateTrayMenu();
-        
-        // 显示通知
-        tray.displayBalloon({
-            iconType: 'info',
-            title: '紧凑模式',
-            content: '已切换到紧凑模式，只显示导航栏'
-        });
-    } else {
-        // 切换到完整模式
-        mainWindow.setSize(APP_CONFIG.fullSize.width, APP_CONFIG.fullSize.height);
-        mainWindow.setResizable(true);
-        loadPage(currentTab);
-        
-        // 更新托盘菜单
-        updateTrayMenu();
-        
-        // 显示通知
-        tray.displayBalloon({
-            iconType: 'info',
-            title: '完整模式',
-            content: `已切换到完整模式，当前页面：${getTabDisplayName(currentTab)}`
-        });
+    // 这个功能现在通过新界面的fold按钮和toggle-sidebar IPC处理
+    // 保留这个函数是为了与托盘菜单兼容
+    if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.executeJavaScript('toggleCollapse()');
     }
-    
-    // 确保窗口可见
-    showWindow();
 }
 
 // 切换Tab
 function switchTab(tabName) {
     currentTab = tabName;
-    
-    if (!isCompactMode) {
-        loadPage(tabName);
-    } else {
-        // 如果在紧凑模式，先切换到完整模式
-        isCompactMode = false;
-        mainWindow.setSize(APP_CONFIG.fullSize.width, APP_CONFIG.fullSize.height);
-        mainWindow.setResizable(true);
-        loadPage(tabName);
-        updateTrayMenu();
-    }
-    
+
+    // 确保窗口可见
     showWindow();
-    
+
+    // 向页面发送Tab切换消息
+    if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('tab-params', { tabName });
+    }
+
     // 显示通知
-    tray.displayBalloon({
-        iconType: 'info',
-        title: '页面切换',
-        content: `已切换到：${getTabDisplayName(tabName)}`
-    });
+    if (tray) {
+        tray.displayBalloon({
+            iconType: 'info',
+            title: '页面切换',
+            content: `已切换到：${getTabDisplayName(tabName)}`
+        });
+    }
 }
 
 // 获取Tab显示名称
@@ -452,7 +431,7 @@ function updateTrayMenu() {
             }
         }
     ]);
-    
+
     tray.setContextMenu(contextMenu);
 }
 
@@ -461,27 +440,27 @@ function createHttpServer() {
     const server = express();
     server.use(cors());
     server.use(express.json());
-    
+
     // 第三方系统调用接口
     server.post('/api/switch-tab', (req, res) => {
         const { tabName, params = {}, windowMode } = req.body;
-        
+
         try {
             // 切换Tab
             switchTab(tabName);
-            
+
             // 设置窗口模式
             if (windowMode === 'compact' && !isCompactMode) {
                 toggleCompactMode();
             } else if (windowMode === 'full' && isCompactMode) {
                 toggleCompactMode();
             }
-            
+
             // 向页面发送参数
             if (mainWindow && Object.keys(params).length > 0) {
                 mainWindow.webContents.send('tab-params', { tabName, params });
             }
-            
+
             res.json({
                 success: true,
                 currentTab: tabName,
@@ -495,7 +474,7 @@ function createHttpServer() {
             });
         }
     });
-    
+
     // 获取当前状态
     server.get('/api/status', (req, res) => {
         res.json({
@@ -504,7 +483,7 @@ function createHttpServer() {
             isVisible: mainWindow ? mainWindow.isVisible() : false
         });
     });
-    
+
     // 控制窗口显示/隐藏
     server.post('/api/window/toggle', (req, res) => {
         if (mainWindow.isVisible()) {
@@ -512,13 +491,13 @@ function createHttpServer() {
         } else {
             showWindow();
         }
-        
+
         res.json({
             success: true,
             isVisible: mainWindow.isVisible()
         });
     });
-    
+
     httpServer = server.listen(APP_CONFIG.httpPort, 'localhost', () => {
         console.log(`医疗AI助手HTTP服务已启动: http://localhost:${APP_CONFIG.httpPort}`);
     });
@@ -539,6 +518,76 @@ ipcMain.handle('quick-action', async (event, action) => {
     console.log('快速操作:', action);
     // 处理快速操作逻辑
     return { success: true, action };
+});
+
+// 窗口控制相关IPC
+ipcMain.handle('window-minimize', async () => {
+    if (mainWindow) {
+        mainWindow.minimize();
+        return { success: true };
+    }
+    return { success: false };
+});
+
+ipcMain.handle('window-close', async () => {
+    if (mainWindow) {
+        mainWindow.hide();
+        showFloatingWindow();
+        return { success: true };
+    }
+    return { success: false };
+});
+
+ipcMain.handle('window-pin', async () => {
+    if (mainWindow) {
+        const isOnTop = mainWindow.isAlwaysOnTop();
+        mainWindow.setAlwaysOnTop(!isOnTop);
+        return { success: true, pinned: !isOnTop };
+    }
+    return { success: false };
+});
+
+ipcMain.handle('toggle-sidebar', async () => {
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    const windowHeight = screenHeight - 80;
+
+    if (mainWindow) {
+        const currentBounds = mainWindow.getBounds();
+
+        if (currentBounds.width === APP_CONFIG.fullSize.width) {
+            // 切换到折叠模式
+            mainWindow.setBounds({
+                x: screenWidth - APP_CONFIG.compactSize.width,
+                y: 40,
+                width: APP_CONFIG.compactSize.width,
+                height: windowHeight
+            });
+            isCompactMode = true;
+        } else {
+            // 切换到展开模式
+            mainWindow.setBounds({
+                x: screenWidth - APP_CONFIG.fullSize.width,
+                y: 40,
+                width: APP_CONFIG.fullSize.width,
+                height: windowHeight
+            });
+            isCompactMode = false;
+        }
+
+        // 确保窗口高度始终适应当前屏幕
+        if (currentBounds.height !== windowHeight) {
+            const bounds = mainWindow.getBounds();
+            mainWindow.setBounds({
+                ...bounds,
+                height: windowHeight
+            });
+        }
+
+        return { success: true, isCompact: isCompactMode };
+    }
+    return { success: false };
 });
 
 // 悬浮窗口相关IPC
@@ -580,10 +629,10 @@ app.whenReady().then(() => {
     createFloatingWindow();
     createTray();
     createHttpServer();
-    
+
     // 启动时显示悬浮图标
     showFloatingWindow();
-    
+
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
@@ -603,7 +652,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     app.isQuiting = true;
-    
+
     // 关闭HTTP服务器
     if (httpServer) {
         httpServer.close();
