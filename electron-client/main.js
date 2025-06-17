@@ -514,11 +514,7 @@ ipcMain.handle('switch-tab', async (event, tabName) => {
     return { success: true, currentTab: tabName };
 });
 
-ipcMain.handle('quick-action', async (event, action) => {
-    console.log('快速操作:', action);
-    // 处理快速操作逻辑
-    return { success: true, action };
-});
+
 
 // 窗口控制相关IPC
 ipcMain.handle('window-minimize', async () => {

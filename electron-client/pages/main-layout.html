@@ -68,8 +68,6 @@
       font-size: 11px;
       font-weight: bold;
       transition: all 0.2s ease;
-      position: relative;
-      z-index: 100;
     }
 
     .minimize-btn {
@@ -256,17 +254,33 @@
       background: #34495e;
       border: none;
       border-radius: 6px;
-      color: #ecf0f1;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
       transition: all 0.3s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      position: relative;
     }
 
     .collapse-btn:hover {
       background: #3498db;
+      transform: scale(1.05);
+      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+    }
+
+    /* 折叠图标 - 三个圆点 */
+    .collapse-icon {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .collapse-icon span {
+      width: 4px;
+      height: 4px;
+      background: #ecf0f1;
+      border-radius: 50%;
     }
 
     /* 内容iframe */
@@ -292,7 +306,6 @@
       top: 0;
       left: 0;
       right: 60px;
-      /* 不覆盖右侧导航栏 */
       height: 30px;
       -webkit-app-region: drag;
       z-index: 10;
@@ -365,7 +378,13 @@
       </div>
 
       <!-- 折叠按钮 -->
-      <button class="collapse-btn" id="collapseBtn" title="折叠/展开">‹</button>
+      <button class="collapse-btn" id="collapseBtn" title="折叠/展开">
+        <div class="collapse-icon">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </button>
     </div>
   </div>
 
@@ -470,7 +489,6 @@
           document.body.classList.toggle('collapsed', isCollapsed);
 
           const collapseBtn = document.getElementById('collapseBtn');
-          collapseBtn.innerHTML = isCollapsed ? '›' : '‹';
           collapseBtn.title = isCollapsed ? '展开' : '折叠';
         }
       }

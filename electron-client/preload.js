@@ -13,8 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Tab切换
     switchTab: (tabName) => ipcRenderer.invoke('switch-tab', tabName),
 
-    // 快速操作
-    quickAction: (action) => ipcRenderer.invoke('quick-action', action),
+
 
     // 悬浮窗口控制
     hideFloatingIcon: () => ipcRenderer.invoke('hide-floating-icon'),
@@ -49,15 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
 });
 
-// WPF兼容接口（如果需要支持WPF客户端）
-contextBridge.exposeInMainWorld('wpfHost', {
-    ShowMainWindow: () => ipcRenderer.invoke('show-main-window'),
-    ToggleCompactMode: () => ipcRenderer.invoke('toggle-compact-mode'),
-    SwitchTab: (tabName) => ipcRenderer.invoke('switch-tab', tabName),
-    QuickAction: (action) => ipcRenderer.invoke('quick-action', action),
-    HideFloatingIcon: () => ipcRenderer.invoke('hide-floating-icon'),
-    ExitApp: () => ipcRenderer.invoke('exit-app')
-});
+
 
 console.log('预加载脚本已加载');
 
