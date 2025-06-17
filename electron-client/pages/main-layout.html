@@ -130,9 +130,11 @@
 
     .logo-text {
       color: #ecf0f1;
-      font-size: 10px;
+      font-size: 12px;
+      font-weight: 600;
       text-align: center;
       line-height: 1.2;
+      letter-spacing: 0.5px;
     }
 
     /* 中间导航区域 */
@@ -159,7 +161,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 28px;
+      font-size: 30px;
       transition: all 0.3s;
       position: relative;
       padding: 6px 2px;
@@ -167,12 +169,13 @@
     }
 
     .nav-item .nav-text {
-      font-size: 10px;
+      font-size: 11px;
       line-height: 1;
       color: #bdc3c7;
       text-align: center;
       word-break: keep-all;
       white-space: nowrap;
+      font-weight: 500;
     }
 
     .nav-item:hover {
@@ -227,7 +230,7 @@
 
     /* 底部区域 */
     .sidebar-bottom {
-      padding: 12px 5px;
+      padding: 10px 3px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -236,15 +239,53 @@
     /* 患者信息 */
     .patient-info {
       color: #bdc3c7;
-      margin-bottom: 16px;
-      text-align: center;
+      margin-bottom: 12px;
+      width: 100%;
+      padding: 0 2px;
     }
 
-    .patient-info .value {
-      font-size: 10px;
-      font-weight: 500;
+    .patient-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
       margin-bottom: 8px;
-      word-break: break-all;
+      min-height: 45px;
+    }
+
+    .patient-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ecf0f1;
+      flex: 1;
+      text-align: left;
+    }
+
+    .patient-dept {
+      font-size: 14px;
+      font-weight: 400;
+      color: #bdc3c7;
+      flex: 1;
+      text-align: right;
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      line-height: 1.2;
+    }
+
+    .patient-divider {
+      width: 100%;
+      height: 1px;
+      background: rgba(189, 195, 199, 0.3);
+      margin: 8px 0;
+    }
+
+    .patient-doctor {
+      font-size: 14px;
+      font-weight: 500;
+      color: #bdc3c7;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* 折叠按钮 */
@@ -371,10 +412,12 @@
     <div class="sidebar-bottom no-drag">
       <!-- 患者信息 -->
       <div class="patient-info">
-        <div class="value">内科</div>
-        <div class="value">张小明</div>
-        <div class="value">男·45岁</div>
-        <div class="value">ID: 2024001</div>
+        <div class="patient-row">
+          <div class="patient-name" id="patientName">张小明</div>
+          <div class="patient-dept" id="deptName">内科</div>
+        </div>
+        <div class="patient-divider"></div>
+        <div class="patient-doctor" id="doctorName">李医生</div>
       </div>
 
       <!-- 折叠按钮 -->
@@ -393,9 +436,20 @@
     let isCollapsed = false;
     let isPinned = false;
 
+    // 患者和医生信息缓存
+    let contextInfo = {
+      patientId: '',
+      patientName: '张小明',
+      deptId: '',
+      deptName: '心血管内科病区',
+      doctorId: '',
+      doctorName: '李医生'
+    };
+
     // 初始化
     document.addEventListener('DOMContentLoaded', function () {
       initializeEventListeners();
+      updatePatientInfo();
     });
 
     function initializeEventListeners() {
@@ -459,6 +513,30 @@
       }
     }
 
+    // 更新患者信息显示
+    function updatePatientInfo() {
+      document.getElementById('patientName').textContent = contextInfo.patientName || '未知患者';
+      document.getElementById('deptName').textContent = contextInfo.deptName || '未知科室';
+      document.getElementById('doctorName').textContent = contextInfo.doctorName || '未知医生';
+    }
+
+    // 设置上下文信息（供外部调用）
+    function setContextInfo(info) {
+      if (info.patientId !== undefined) contextInfo.patientId = info.patientId;
+      if (info.patientName !== undefined) contextInfo.patientName = info.patientName;
+      if (info.deptId !== undefined) contextInfo.deptId = info.deptId;
+      if (info.deptName !== undefined) contextInfo.deptName = info.deptName;
+      if (info.doctorId !== undefined) contextInfo.doctorId = info.doctorId;
+      if (info.doctorName !== undefined) contextInfo.doctorName = info.doctorName;
+
+      updatePatientInfo();
+    }
+
+    // 获取上下文信息（供页面使用）
+    function getContextInfo() {
+      return { ...contextInfo };
+    }
+
     // 切换页面
     function switchPage(page) {
       if (currentPage === page) return;
@@ -468,7 +546,7 @@
         item.classList.toggle('active', item.dataset.page === page);
       });
 
-      // 切换页面内容
+      // 切换页面内容，并传递上下文信息
       const iframe = document.getElementById('contentFrame');
       iframe.src = `${page}.html`;
 
@@ -478,6 +556,17 @@
       if (window.electronAPI && window.electronAPI.switchTab) {
         window.electronAPI.switchTab(page);
       }
+
+      // 页面加载完成后传递上下文信息
+      iframe.onload = function () {
+        try {
+          if (iframe.contentWindow && iframe.contentWindow.setContextInfo) {
+            iframe.contentWindow.setContextInfo(contextInfo);
+          }
+        } catch (e) {
+          // 跨域或其他错误，忽略
+        }
+      };
     }
 
     // 折叠/展开功能
@@ -502,6 +591,14 @@
         }
       });
     }
+
+    // 暴露全局API供外部调用
+    window.mainLayout = {
+      setContextInfo: setContextInfo,
+      getContextInfo: getContextInfo,
+      switchPage: switchPage,
+      updatePatientInfo: updatePatientInfo
+    };
   </script>
 </body>
 
