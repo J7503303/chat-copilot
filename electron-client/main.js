@@ -12,9 +12,11 @@ let httpServer;
 
 // 应用配置
 const APP_CONFIG = {
-    compactSize: { width: 60, height: 800 }, // 折叠时只显示导航栏
-    fullSize: { width: 540, height: 800 }, // 展开时显示完整界面
-    httpPort: 19876 // 改为不易冲突的端口
+    compactSize: { width: 60 }, // 折叠时只显示导航栏
+    fullSize: { width: 540 }, // 展开时显示完整界面
+    httpPort: 19876, // 改为不易冲突的端口
+    marginTop: 40, // 距离屏幕顶部的边距
+    marginBottom: 40 // 距离屏幕底部的边距
 };
 
 // 创建主窗口
@@ -24,14 +26,14 @@ function createWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-    // 计算窗口高度（适应屏幕高度，留出一些边距）
-    const windowHeight = screenHeight - 80;
+    // 计算窗口高度（适应屏幕高度，留出边距）
+    const windowHeight = screenHeight - APP_CONFIG.marginTop - APP_CONFIG.marginBottom;
 
     mainWindow = new BrowserWindow({
         width: APP_CONFIG.fullSize.width,
         height: windowHeight,
         x: screenWidth - APP_CONFIG.fullSize.width, // 贴右边显示
-        y: 40, // 距离顶部40px
+        y: APP_CONFIG.marginTop, // 距离顶部边距
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -271,14 +273,14 @@ function adjustWindowSize() {
         const { screen } = require('electron');
         const primaryDisplay = screen.getPrimaryDisplay();
         const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-        const windowHeight = screenHeight - 80;
+        const windowHeight = screenHeight - APP_CONFIG.marginTop - APP_CONFIG.marginBottom;
 
         const currentBounds = mainWindow.getBounds();
         const targetWidth = isCompactMode ? APP_CONFIG.compactSize.width : APP_CONFIG.fullSize.width;
 
         mainWindow.setBounds({
             x: screenWidth - targetWidth,
-            y: 40,
+            y: APP_CONFIG.marginTop,
             width: targetWidth,
             height: windowHeight
         });
@@ -646,7 +648,7 @@ ipcMain.handle('toggle-sidebar', async () => {
     const { screen } = require('electron');
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-    const windowHeight = screenHeight - 80;
+    const windowHeight = screenHeight - APP_CONFIG.marginTop - APP_CONFIG.marginBottom;
 
     if (mainWindow) {
         const currentBounds = mainWindow.getBounds();
@@ -655,7 +657,7 @@ ipcMain.handle('toggle-sidebar', async () => {
             // 切换到折叠模式
             mainWindow.setBounds({
                 x: screenWidth - APP_CONFIG.compactSize.width,
-                y: 40,
+                y: APP_CONFIG.marginTop,
                 width: APP_CONFIG.compactSize.width,
                 height: windowHeight
             });
@@ -664,7 +666,7 @@ ipcMain.handle('toggle-sidebar', async () => {
             // 切换到展开模式
             mainWindow.setBounds({
                 x: screenWidth - APP_CONFIG.fullSize.width,
-                y: 40,
+                y: APP_CONFIG.marginTop,
                 width: APP_CONFIG.fullSize.width,
                 height: windowHeight
             });

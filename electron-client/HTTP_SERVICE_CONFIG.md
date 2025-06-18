@@ -3,6 +3,28 @@
 ## 服务概述
 该Electron应用集成了Express HTTP服务器，用于提供API接口供第三方系统调用。
 
+## 窗口配置
+
+### 屏幕高度自适应
+应用程序会自动适应屏幕高度，窗口高度计算公式：
+```
+窗口高度 = 屏幕高度 - marginTop - marginBottom
+```
+
+- **marginTop**: 距离屏幕顶部的边距 (默认40px)
+- **marginBottom**: 距离屏幕底部的边距 (默认40px)
+- 支持不同分辨率的屏幕
+- 窗口切换和调整时自动重新计算
+
+### 自定义边距
+如需调整窗口与屏幕边缘的距离，可修改配置：
+```javascript
+const APP_CONFIG = {
+    marginTop: 60,    // 增大顶部边距
+    marginBottom: 20  // 减小底部边距
+};
+```
+
 ## 端口配置
 
 ### 默认端口: 19876
@@ -18,9 +40,11 @@
 
 ```javascript
 const APP_CONFIG = {
-    compactSize: { width: 60, height: 800 },
-    fullSize: { width: 540, height: 800 },
-    httpPort: 19876 // 在这里修改端口号
+    compactSize: { width: 60 },
+    fullSize: { width: 540 },
+    httpPort: 19876, // 在这里修改端口号
+    marginTop: 40,    // 距离屏幕顶部的边距
+    marginBottom: 40  // 距离屏幕底部的边距
 };
 ```
 
