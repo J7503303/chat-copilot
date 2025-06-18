@@ -14,7 +14,7 @@ let httpServer;
 const APP_CONFIG = {
     compactSize: { width: 60, height: 800 }, // 折叠时只显示导航栏
     fullSize: { width: 540, height: 800 }, // 展开时显示完整界面
-    httpPort: 3000
+    httpPort: 19876 // 改为不易冲突的端口
 };
 
 // 创建主窗口
@@ -196,7 +196,7 @@ function createTray() {
             label: '设置',
             click: () => {
                 // 打开设置页面
-                shell.openExternal('http://localhost:3000/settings');
+                shell.openExternal(`http://localhost:${APP_CONFIG.httpPort}/settings`);
             }
         },
         {
@@ -430,7 +430,7 @@ function updateTrayMenu() {
         {
             label: '设置',
             click: () => {
-                shell.openExternal('http://localhost:3000/settings');
+                shell.openExternal(`http://localhost:${APP_CONFIG.httpPort}/settings`);
             }
         },
         {
@@ -520,9 +520,35 @@ function createHttpServer() {
         });
     });
 
-    httpServer = server.listen(APP_CONFIG.httpPort, 'localhost', () => {
-        console.log(`医疗AI助手HTTP服务已启动: http://localhost:${APP_CONFIG.httpPort}`);
-    });
+    // 尝试启动HTTP服务器，如果端口被占用则尝试其他端口
+    const tryPorts = [APP_CONFIG.httpPort, 19877, 19878, 19879, 19880];
+    let serverStarted = false;
+
+    for (const port of tryPorts) {
+        try {
+            httpServer = server.listen(port, 'localhost', () => {
+                console.log(`医疗AI助手HTTP服务已启动: http://localhost:${port}`);
+                APP_CONFIG.httpPort = port; // 更新实际使用的端口
+                serverStarted = true;
+            });
+
+            httpServer.on('error', (err) => {
+                if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+                    console.log(`端口 ${port} 不可用，尝试下一个端口...`);
+                    httpServer = null;
+                } else {
+                    console.error('HTTP服务器错误:', err);
+                }
+            });
+
+            break; // 成功启动就跳出循环
+        } catch (error) {
+            console.log(`端口 ${port} 不可用: ${error.message}`);
+            if (port === tryPorts[tryPorts.length - 1]) {
+                console.error('所有端口都不可用，HTTP服务启动失败');
+            }
+        }
+    }
 }
 
 // IPC事件处理
