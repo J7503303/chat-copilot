@@ -17,24 +17,30 @@
 - 窗口切换和调整时自动重新计算
 
 ### 屏幕空间充分利用
-为了最大化屏幕空间利用率，应用程序使用以下策略：
+为了最大化屏幕空间利用率，同时避免与系统UI冲突，应用程序使用以下策略：
 
 ```javascript
-// 使用完整屏幕尺寸而非工作区尺寸
-const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
+// 使用工作区尺寸，避免与任务栏等系统UI冲突
+const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-// 边距设置为0，充分利用屏幕高度
+// 设置小边距，充分利用工作区空间
 const APP_CONFIG = {
-    marginTop: 0,     // 贴近屏幕顶部
-    marginBottom: 0   // 贴近屏幕底部
+    marginTop: 5,     // 距离工作区顶部的小边距
+    marginBottom: 5   // 距离工作区底部的小边距，避免与任务栏冲突
 };
 ```
 
+**优化策略**:
+- 使用 `workAreaSize` 而非 `size`，自动排除任务栏高度
+- 设置小边距（5px）既充分利用空间又避免贴边
+- 窗口高度 = 工作区高度 - 10px（上下边距）
+- 避免覆盖任务栏或被任务栏遮挡
+
 **优化效果**:
-- 窗口高度几乎等于屏幕高度
-- 不受任务栏等系统UI限制
+- 窗口高度接近工作区高度，最大化可用空间
+- 不会覆盖或被任务栏遮挡
 - 适配各种分辨率和DPI设置
-- 最大化可视区域利用率
+- 兼容任务栏自动隐藏/置顶等行为
 
 ### 自定义边距
 如需调整窗口与屏幕边缘的距离，可修改配置：

@@ -71,20 +71,20 @@ Write-Host "=== 测试完成 ===" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "屏幕空间优化特性:" -ForegroundColor Yellow
-Write-Host "✓ 使用 primaryDisplay.size 获取完整屏幕尺寸" -ForegroundColor Green
-Write-Host "✓ marginTop 和 marginBottom 设为 0" -ForegroundColor Green
-Write-Host "✓ 窗口高度 = 屏幕高度 - 0 - 0 = 屏幕高度" -ForegroundColor Green
-Write-Host "✓ 不受任务栏等系统UI限制" -ForegroundColor Green
-Write-Host "✓ 最大化屏幕空间利用率" -ForegroundColor Green
+Write-Host "✓ 使用 primaryDisplay.workAreaSize 避免与任务栏冲突" -ForegroundColor Green
+Write-Host "✓ marginTop 和 marginBottom 设为 5px 小边距" -ForegroundColor Green
+Write-Host "✓ 窗口高度 = 工作区高度 - 5 - 5 = 工作区高度 - 10px" -ForegroundColor Green
+Write-Host "✓ 不会覆盖任务栏或被任务栏遮挡" -ForegroundColor Green
+Write-Host "✓ 最大化可用空间利用率" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "技术改进点:" -ForegroundColor Cyan
-Write-Host "- createWindow(): 使用 primaryDisplay.size" -ForegroundColor Gray
-Write-Host "- adjustWindowSize(): 使用 primaryDisplay.size" -ForegroundColor Gray
-Write-Host "- toggle-sidebar IPC: 使用 primaryDisplay.size" -ForegroundColor Gray
-Write-Host "- showFloatingWindow(): 使用 primaryDisplay.size" -ForegroundColor Gray
-Write-Host "- APP_CONFIG.marginTop: 40 → 0" -ForegroundColor Gray
-Write-Host "- APP_CONFIG.marginBottom: 40 → 0" -ForegroundColor Gray
+Write-Host "- createWindow(): 使用 primaryDisplay.workAreaSize" -ForegroundColor Gray
+Write-Host "- adjustWindowSize(): 使用 primaryDisplay.workAreaSize" -ForegroundColor Gray
+Write-Host "- toggle-sidebar IPC: 使用 primaryDisplay.workAreaSize" -ForegroundColor Gray
+Write-Host "- showFloatingWindow(): 使用 primaryDisplay.workAreaSize" -ForegroundColor Gray
+Write-Host "- APP_CONFIG.marginTop: 40 → 5" -ForegroundColor Gray
+Write-Host "- APP_CONFIG.marginBottom: 40 → 5" -ForegroundColor Gray
 Write-Host ""
 
 Write-Host "手动验证要点:" -ForegroundColor Magenta
@@ -96,7 +96,8 @@ Write-Host "5. 验证患者信息变化时的滚动适应" -ForegroundColor Gray
 Write-Host ""
 
 Write-Host "预期效果:" -ForegroundColor Green
-Write-Host "✓ 窗口高度接近或等于屏幕高度" -ForegroundColor White
-Write-Host "✓ 充分利用高分辨率显示器" -ForegroundColor White
-Write-Host "✓ 最大化可视区域和工作空间" -ForegroundColor White
+Write-Host "✓ 窗口高度接近工作区高度（工作区高度-10px）" -ForegroundColor White
+Write-Host "✓ 不会覆盖任务栏或被任务栏遮挡" -ForegroundColor White
+Write-Host "✓ 充分利用可用工作空间" -ForegroundColor White
+Write-Host "✓ 兼容任务栏自动隐藏/置顶等行为" -ForegroundColor White
 Write-Host "✓ 适配各种屏幕尺寸和DPI设置" -ForegroundColor White 
