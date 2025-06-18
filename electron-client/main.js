@@ -520,6 +520,107 @@ function createHttpServer() {
         });
     });
 
+    // 统一的GET接口 - 支持页面切换和参数传递
+    server.get('/api/v1/navigate', (req, res) => {
+        try {
+            const {
+                page,           // 页面名称 (chat|diagnosis|report|record|quality|documents)
+                doctor_id,      // 医生ID
+                doctor_code,    // 医生编码
+                doctor_name,    // 医生姓名
+                dept_id,        // 科室ID
+                dept_code,      // 科室编码
+                dept_name,      // 科室名称
+                patient_id,     // 患者ID
+                patient_name,   // 患者姓名
+                patient_bed,    // 床位号
+                patient_sex,    // 患者性别
+                patient_age,    // 患者年龄
+                window_mode     // 窗口模式 (compact|full)
+            } = req.query;
+
+            // 验证页面参数
+            const validPages = ['chat', 'diagnosis', 'report', 'record', 'quality', 'documents'];
+            if (page && !validPages.includes(page)) {
+                return res.status(400).json({
+                    success: false,
+                    error: `无效的页面参数。支持的页面: ${validPages.join(', ')}`
+                });
+            }
+
+            // 构建参数对象
+            const params = {
+                doctor: {
+                    id: doctor_id,
+                    code: doctor_code,
+                    name: doctor_name
+                },
+                department: {
+                    id: dept_id,
+                    code: dept_code,
+                    name: dept_name
+                },
+                patient: {
+                    id: patient_id,
+                    name: patient_name,
+                    bed: patient_bed,
+                    sex: patient_sex,
+                    age: patient_age
+                }
+            };
+
+            // 过滤掉空值
+            const cleanParams = JSON.parse(JSON.stringify(params, (key, value) => {
+                return value === undefined || value === '' ? undefined : value;
+            }));
+
+            // 显示主窗口
+            showWindow();
+
+            // 切换页面（如果指定了页面）
+            if (page) {
+                switchTab(page);
+            }
+
+            // 设置窗口模式
+            if (window_mode === 'compact' && !isCompactMode) {
+                toggleCompactMode();
+            } else if (window_mode === 'full' && isCompactMode) {
+                toggleCompactMode();
+            }
+
+            // 向页面发送参数
+            if (mainWindow && Object.keys(cleanParams).some(key =>
+                Object.keys(cleanParams[key]).some(subKey => cleanParams[key][subKey] !== undefined)
+            )) {
+                mainWindow.webContents.send('navigation-params', {
+                    page: page || currentTab,
+                    params: cleanParams,
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            // 返回成功响应
+            res.json({
+                success: true,
+                data: {
+                    current_page: page || currentTab,
+                    window_mode: isCompactMode ? 'compact' : 'full',
+                    is_visible: mainWindow.isVisible(),
+                    received_params: cleanParams
+                },
+                message: `已切换到${getTabDisplayName(page || currentTab)}`
+            });
+
+        } catch (error) {
+            console.error('导航接口错误:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
     // 尝试启动HTTP服务器，如果端口被占用则尝试其他端口
     const tryPorts = [APP_CONFIG.httpPort, 19877, 19878, 19879, 19880];
     let serverStarted = false;

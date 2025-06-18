@@ -264,9 +264,35 @@
     .patient-row {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: flex-end;
       margin-bottom: 8px;
       min-height: 45px;
+      gap: 8px;
+    }
+
+    .patient-bed {
+      font-size: 14px;
+      font-weight: 500;
+      color: #bdc3c7;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .bed-number {
+      font-weight: 600;
+      color: #bdc3c7;
+    }
+
+    .bed-text {
+      font-weight: 500;
+      color: #bdc3c7;
     }
 
     .patient-name {
@@ -275,6 +301,13 @@
       color: #ecf0f1;
       flex: 1;
       text-align: left;
+      line-height: 1.2;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: flex-end;
+      writing-mode: vertical-rl;
+      text-orientation: upright;
     }
 
     .patient-dept {
@@ -286,6 +319,11 @@
       writing-mode: vertical-rl;
       text-orientation: upright;
       line-height: 1.2;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
     }
 
     .patient-divider {
@@ -431,11 +469,17 @@
       <!-- 患者信息 -->
       <div class="patient-info">
         <div class="patient-row">
-          <div class="patient-name" id="patientName">张小明</div>
-          <div class="patient-dept" id="deptName">内科</div>
+          <div class="patient-name" id="patientName">未知患者</div>
+          <div class="patient-dept" id="deptName"></div>
         </div>
+        <div class="patient-bed" id="patientBed" style="display: none;">
+          <span class="bed-number"></span>
+          <span class="bed-text">床</span>
+        </div>
+        <div class="patient-details" id="patientDetails"
+          style="font-size: 9px; color: #95a5a6; text-align: center; margin: 2px 0; display: none;"></div>
         <div class="patient-divider"></div>
-        <div class="patient-doctor" id="doctorName">李医生</div>
+        <div class="patient-doctor" id="doctorName"></div>
       </div>
 
       <!-- 折叠按钮 -->
@@ -457,11 +501,14 @@
     // 患者和医生信息缓存
     let contextInfo = {
       patientId: '',
-      patientName: '张小明',
+      patientName: '',
+      patientBed: '',
+      patientSex: '',
+      patientAge: '',
       deptId: '',
-      deptName: '心血管内科病区',
+      deptName: '',
       doctorId: '',
-      doctorName: '李医生'
+      doctorName: ''
     };
 
     // 初始化
@@ -533,15 +580,47 @@
 
     // 更新患者信息显示
     function updatePatientInfo() {
+      // 患者姓名：如果没有则显示"未知患者"
       document.getElementById('patientName').textContent = contextInfo.patientName || '未知患者';
-      document.getElementById('deptName').textContent = contextInfo.deptName || '未知科室';
-      document.getElementById('doctorName').textContent = contextInfo.doctorName || '未知医生';
+
+      // 科室名称：如果没有则留空
+      document.getElementById('deptName').textContent = contextInfo.deptName || '';
+
+      // 医生姓名：如果没有则留空
+      document.getElementById('doctorName').textContent = contextInfo.doctorName || '';
+
+      // 更新床号显示
+      const bedElement = document.getElementById('patientBed');
+      if (contextInfo.patientBed) {
+        const bedNumber = contextInfo.patientBed.replace(/[^\d]/g, ''); // 提取数字
+        const bedNumberElement = bedElement.querySelector('.bed-number');
+        bedNumberElement.textContent = bedNumber;
+        bedElement.style.display = 'flex';
+      } else {
+        bedElement.style.display = 'none';
+      }
+
+      // 更新患者详细信息（不再包含床位，因为床位已经单独显示）
+      const details = [];
+      if (contextInfo.patientSex) details.push(contextInfo.patientSex);
+      if (contextInfo.patientAge) details.push(`${contextInfo.patientAge}岁`);
+
+      const detailsElement = document.getElementById('patientDetails');
+      if (details.length > 0) {
+        detailsElement.textContent = details.join(' | ');
+        detailsElement.style.display = 'block';
+      } else {
+        detailsElement.style.display = 'none';
+      }
     }
 
     // 设置上下文信息（供外部调用）
     function setContextInfo(info) {
       if (info.patientId !== undefined) contextInfo.patientId = info.patientId;
       if (info.patientName !== undefined) contextInfo.patientName = info.patientName;
+      if (info.patientBed !== undefined) contextInfo.patientBed = info.patientBed;
+      if (info.patientSex !== undefined) contextInfo.patientSex = info.patientSex;
+      if (info.patientAge !== undefined) contextInfo.patientAge = info.patientAge;
       if (info.deptId !== undefined) contextInfo.deptId = info.deptId;
       if (info.deptName !== undefined) contextInfo.deptName = info.deptName;
       if (info.doctorId !== undefined) contextInfo.doctorId = info.doctorId;
@@ -606,6 +685,50 @@
       window.electronAPI.onTabParams((data) => {
         if (data.tabName && data.tabName !== currentPage) {
           switchPage(data.tabName);
+        }
+      });
+    }
+
+    // 监听导航参数事件
+    if (window.electronAPI && window.electronAPI.onNavigationParams) {
+      window.electronAPI.onNavigationParams((data) => {
+        console.log('收到导航参数:', data);
+
+        // 更新上下文信息
+        if (data.params) {
+          const newContextInfo = {};
+
+          // 处理医生信息
+          if (data.params.doctor) {
+            if (data.params.doctor.id) newContextInfo.doctorId = data.params.doctor.id;
+            if (data.params.doctor.code) newContextInfo.doctorCode = data.params.doctor.code;
+            if (data.params.doctor.name) newContextInfo.doctorName = data.params.doctor.name;
+          }
+
+          // 处理科室信息
+          if (data.params.department) {
+            if (data.params.department.id) newContextInfo.deptId = data.params.department.id;
+            if (data.params.department.code) newContextInfo.deptCode = data.params.department.code;
+            if (data.params.department.name) newContextInfo.deptName = data.params.department.name;
+          }
+
+          // 处理患者信息
+          if (data.params.patient) {
+            if (data.params.patient.id) newContextInfo.patientId = data.params.patient.id;
+            if (data.params.patient.name) newContextInfo.patientName = data.params.patient.name;
+            if (data.params.patient.bed) newContextInfo.patientBed = data.params.patient.bed;
+            if (data.params.patient.sex) newContextInfo.patientSex = data.params.patient.sex;
+            if (data.params.patient.age) newContextInfo.patientAge = data.params.patient.age;
+          }
+
+          // 更新上下文信息
+          setContextInfo(newContextInfo);
+          console.log('更新后的上下文信息:', contextInfo);
+        }
+
+        // 切换页面（如果指定了页面）
+        if (data.page && data.page !== currentPage) {
+          switchPage(data.page);
         }
       });
     }

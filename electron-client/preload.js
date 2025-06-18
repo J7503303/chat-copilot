@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('tab-params', (event, data) => callback(data));
     },
 
+    onNavigationParams: (callback) => {
+        ipcRenderer.on('navigation-params', (event, data) => callback(data));
+    },
+
     // 移除事件监听
     removeAllListeners: (channel) => {
         ipcRenderer.removeAllListeners(channel);

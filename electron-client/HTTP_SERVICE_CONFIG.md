@@ -26,7 +26,65 @@ const APP_CONFIG = {
 
 ## 可用API接口
 
-### 1. 切换标签页
+### 1. 统一导航接口 (推荐使用)
+- **URL**: `GET /api/v1/navigate`
+- **说明**: 通过GET请求进行页面切换和参数传递
+- **参数**:
+  - `page`: 页面名称 (可选)
+    - `chat` - 智能问诊
+    - `diagnosis` - 病情分析
+    - `report` - 检验解读
+    - `record` - 病历生成
+    - `quality` - 病历质控
+    - `documents` - 文档管理
+  - `doctor_id`: 医生ID
+  - `doctor_code`: 医生编码
+  - `doctor_name`: 医生姓名
+  - `dept_id`: 科室ID
+  - `dept_code`: 科室编码
+  - `dept_name`: 科室名称
+  - `patient_id`: 患者ID
+  - `patient_name`: 患者姓名
+  - `patient_bed`: 床位号
+  - `patient_sex`: 患者性别
+  - `patient_age`: 患者年龄
+  - `window_mode`: 窗口模式 (compact|full)
+
+- **示例调用**:
+  ```
+  http://localhost:19876/api/v1/navigate?page=chat&doctor_id=D001&doctor_name=张医生&dept_name=内科&patient_id=P001&patient_name=李患者&patient_bed=101&patient_sex=男&patient_age=45
+  ```
+
+- **响应**:
+  ```json
+  {
+      "success": true,
+      "data": {
+          "current_page": "chat",
+          "window_mode": "full",
+          "is_visible": true,
+          "received_params": {
+              "doctor": {
+                  "id": "D001",
+                  "name": "张医生"
+              },
+              "department": {
+                  "name": "内科"
+              },
+              "patient": {
+                  "id": "P001",
+                  "name": "李患者",
+                  "bed": "101",
+                  "sex": "男",
+                  "age": "45"
+              }
+          }
+      },
+      "message": "已切换到智能问诊"
+  }
+  ```
+
+### 2. 切换标签页 (POST方式)
 - **URL**: `POST /api/switch-tab`
 - **参数**:
   ```json
@@ -37,7 +95,7 @@ const APP_CONFIG = {
   }
   ```
 
-### 2. 获取当前状态
+### 3. 获取当前状态
 - **URL**: `GET /api/status`
 - **响应**:
   ```json
@@ -48,7 +106,7 @@ const APP_CONFIG = {
   }
   ```
 
-### 3. 切换窗口显示/隐藏
+### 4. 切换窗口显示/隐藏
 - **URL**: `POST /api/window/toggle`
 - **响应**:
   ```json
@@ -79,6 +137,72 @@ const APP_CONFIG = {
 启动应用后，在控制台可以看到：
 ```
 医疗AI助手HTTP服务已启动: http://localhost:19876
+```
+
+## 测试HTTP服务
+
+### 方法1: 浏览器测试
+直接在浏览器地址栏输入以下URL进行测试：
+
+**基本状态检查:**
+```
+http://localhost:19876/api/status
+```
+
+**导航接口测试:**
+```
+http://localhost:19876/api/v1/navigate?page=chat&doctor_name=测试医生&patient_name=测试患者
+```
+
+### 方法2: PowerShell测试
+```powershell
+# 检查服务状态
+Invoke-WebRequest -Uri "http://localhost:19876/api/status" -Method GET
+
+# 测试导航接口
+Invoke-WebRequest -Uri "http://localhost:19876/api/v1/navigate?page=diagnosis&doctor_id=D001&patient_name=张三" -Method GET
+```
+
+### 方法3: curl测试 (如果安装了curl)
+```bash
+# 检查服务状态
+curl "http://localhost:19876/api/status"
+
+# 测试导航接口
+curl "http://localhost:19876/api/v1/navigate?page=report&doctor_name=李医生&patient_id=P001"
+```
+
+## 参数使用说明
+
+### 必需参数
+- 无必需参数，所有参数都是可选的
+
+### 常用参数组合
+
+**医生信息:**
+- `doctor_id` + `doctor_name`
+- `doctor_code` + `doctor_name`
+
+**科室信息:**
+- `dept_id` + `dept_name`
+- `dept_code` + `dept_name`
+
+**患者信息:**
+- `patient_id` + `patient_name`
+- `patient_name` + `patient_bed` + `patient_sex` + `patient_age`
+
+### URL编码说明
+如果参数包含中文或特殊字符，需要进行URL编码：
+- 空格: `%20`
+- 中文: 使用UTF-8编码
+
+**示例:**
+```
+# 原始URL
+http://localhost:19876/api/v1/navigate?doctor_name=张医生&patient_name=李患者
+
+# URL编码后
+http://localhost:19876/api/v1/navigate?doctor_name=%E5%BC%A0%E5%8C%BB%E7%94%9F&patient_name=%E6%9D%8E%E6%82%A3%E8%80%85
 ```
 
 ## 安全说明

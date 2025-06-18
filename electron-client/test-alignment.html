@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>患者信息对齐测试</title>
+  <style>
+    body {
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 20px;
+    }
+
+    .test-container {
+      width: 60px;
+      background: #34495e;
+      padding: 10px 3px;
+      border-radius: 8px;
+      margin: 20px;
+    }
+
+    .patient-info {
+      color: #bdc3c7;
+      margin-bottom: 12px;
+      width: 100%;
+      padding: 0 2px;
+    }
+
+    .patient-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 8px;
+      min-height: 45px;
+      gap: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      /* 用于调试对齐 */
+    }
+
+    .patient-bed {
+      font-size: 14px;
+      font-weight: 500;
+      color: #bdc3c7;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: rgba(0, 0, 255, 0.1);
+      /* 蓝色背景用于调试 */
+    }
+
+    .bed-number {
+      font-weight: 600;
+      color: #3498db;
+    }
+
+    .bed-text {
+      font-weight: 500;
+      color: #bdc3c7;
+    }
+
+    .patient-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ecf0f1;
+      flex: 1;
+      text-align: left;
+      line-height: 1.2;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: flex-end;
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      background: rgba(255, 0, 0, 0.1);
+      /* 红色背景用于调试 */
+    }
+
+    .patient-dept {
+      font-size: 14px;
+      font-weight: 400;
+      color: #bdc3c7;
+      flex: 1;
+      text-align: right;
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      line-height: 1.2;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      background: rgba(0, 255, 0, 0.1);
+      /* 绿色背景用于调试 */
+    }
+
+    .patient-details {
+      font-size: 9px;
+      color: #95a5a6;
+      text-align: center;
+      margin: 2px 0;
+    }
+
+    .patient-divider {
+      width: 100%;
+      height: 1px;
+      background: rgba(189, 195, 199, 0.3);
+      margin: 8px 0;
+    }
+
+    .patient-doctor {
+      font-size: 14px;
+      font-weight: 500;
+      color: #bdc3c7;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .test-label {
+      color: #3498db;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>患者信息对齐测试</h1>
+
+  <div class="test-label">测试1: 短姓名 + 短科室 + 床号</div>
+  <div class="test-container">
+    <div class="patient-info">
+      <div class="patient-row">
+        <div class="patient-name">李患者</div>
+        <div class="patient-dept">内科</div>
+      </div>
+      <div class="patient-bed">
+        <span class="bed-number">19</span>
+        <span class="bed-text">床</span>
+      </div>
+      <div class="patient-details">男 | 45岁</div>
+      <div class="patient-divider"></div>
+      <div class="patient-doctor">张医生</div>
+    </div>
+  </div>
+
+  <div class="test-label">测试2: 长姓名 + 长科室 + 长床号</div>
+  <div class="test-container">
+    <div class="patient-info">
+      <div class="patient-row">
+        <div class="patient-name">王老先生</div>
+        <div class="patient-dept">心血管内科</div>
+      </div>
+      <div class="patient-bed">
+        <span class="bed-number">ICU-A-0123</span>
+        <span class="bed-text">床</span>
+      </div>
+      <div class="patient-details">男 | 68岁</div>
+      <div class="patient-divider"></div>
+      <div class="patient-doctor">李主任医师</div>
+    </div>
+  </div>
+
+  <div class="test-label">测试3: 只有姓名（无床号）</div>
+  <div class="test-container">
+    <div class="patient-info">
+      <div class="patient-row">
+        <div class="patient-name">陈患者</div>
+        <div class="patient-dept"></div>
+      </div>
+      <div class="patient-bed" style="display: none;">
+        <span class="bed-number"></span>
+        <span class="bed-text">床</span>
+      </div>
+      <div class="patient-details" style="display: none;"></div>
+      <div class="patient-divider"></div>
+      <div class="patient-doctor"></div>
+    </div>
+  </div>
+
+  <div class="test-label">测试4: 超长床号测试</div>
+  <div class="test-container">
+    <div class="patient-info">
+      <div class="patient-row">
+        <div class="patient-name">张三</div>
+        <div class="patient-dept">外科</div>
+      </div>
+      <div class="patient-bed">
+        <span class="bed-number">ICU-VIP-A-001-SPECIAL</span>
+        <span class="bed-text">床</span>
+      </div>
+      <div class="patient-details">男 | 32岁</div>
+      <div class="patient-divider"></div>
+      <div class="patient-doctor">王医生</div>
+    </div>
+  </div>
+
+  <div class="test-label">测试5: 默认状态</div>
+  <div class="test-container">
+    <div class="patient-info">
+      <div class="patient-row">
+        <div class="patient-name">未知患者</div>
+        <div class="patient-dept"></div>
+      </div>
+      <div class="patient-bed" style="display: none;">
+        <span class="bed-number"></span>
+        <span class="bed-text">床</span>
+      </div>
+      <div class="patient-details" style="display: none;"></div>
+      <div class="patient-divider"></div>
+      <div class="patient-doctor"></div>
+    </div>
+  </div>
+
+  <p style="color: #95a5a6; margin-top: 30px;">
+    注意：红色背景是患者姓名区域，绿色背景是科室区域。<br>
+    两个区域应该在底部对齐，这样看起来更美观。
+  </p>
+</body>
+
+</html>
