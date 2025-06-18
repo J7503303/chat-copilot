@@ -712,6 +712,12 @@
       } else {
         detailsElement.style.display = 'none';
       }
+
+      // 患者信息更新后重新计算导航滚动
+      // 需要延迟执行，等待DOM更新完成
+      setTimeout(() => {
+        initializeNavScroll();
+      }, 50);
     }
 
     // 设置上下文信息（供外部调用）
@@ -863,17 +869,25 @@
       // 计算容器高度和单个项目高度
       const containerHeight = container.clientHeight;
       const itemHeight = 68 + 6; // nav-item高度 + gap
-      maxVisibleItems = Math.floor(containerHeight / itemHeight);
+      const newMaxVisibleItems = Math.floor(containerHeight / itemHeight);
 
       console.log('导航滚动初始化:', {
         containerHeight,
         itemHeight,
-        maxVisibleItems,
-        totalItems
+        oldMaxVisibleItems: maxVisibleItems,
+        newMaxVisibleItems,
+        totalItems,
+        currentScrollIndex
       });
 
-      // 重置滚动位置
-      currentScrollIndex = 0;
+      maxVisibleItems = newMaxVisibleItems;
+
+      // 如果当前滚动位置超出了新的范围，调整滚动位置
+      if (currentScrollIndex + maxVisibleItems > totalItems) {
+        currentScrollIndex = Math.max(0, totalItems - maxVisibleItems);
+        console.log('调整滚动位置到:', currentScrollIndex);
+      }
+
       updateNavScroll();
     }
 

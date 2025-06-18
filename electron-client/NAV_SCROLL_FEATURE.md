@@ -119,6 +119,35 @@ async function toggleCollapse() {
 }
 ```
 
+### 患者信息更新时重新计算
+
+```javascript
+function updatePatientInfo() {
+  // ... 更新患者信息显示 ...
+  
+  // 患者信息更新后重新计算导航滚动
+  // 需要延迟执行，等待DOM更新完成
+  setTimeout(() => {
+    initializeNavScroll();
+  }, 50);
+}
+```
+
+### 智能滚动位置调整
+
+```javascript
+function initializeNavScroll() {
+  // ... 计算新的可视项目数量 ...
+  
+  // 如果当前滚动位置超出了新的范围，调整滚动位置
+  if (currentScrollIndex + maxVisibleItems > totalItems) {
+    currentScrollIndex = Math.max(0, totalItems - maxVisibleItems);
+  }
+  
+  updateNavScroll();
+}
+```
+
 ## 用户交互
 
 ### 滚动操作
@@ -156,6 +185,36 @@ async function toggleCollapse() {
 - 使用CSS `transform` 而非改变 `top` 值，利用GPU加速
 - 防抖处理窗口大小变化事件
 - 只在必要时重新计算布局参数
+
+## 问题解决
+
+### 患者信息更新导致滚动显示异常
+
+**问题描述**: 当应用启动时患者信息较少，滚动到最后一个导航按钮可以完整显示。但当通过API调用传入完整患者信息后，患者信息区域高度增加，导致最后一个导航按钮被部分遮挡。
+
+**解决方案**: 
+1. 在 `updatePatientInfo()` 函数中添加滚动重新计算
+2. 在 `initializeNavScroll()` 函数中添加智能位置调整
+3. 确保滚动位置不会超出有效范围
+
+**技术实现**:
+```javascript
+// 在患者信息更新后重新计算
+function updatePatientInfo() {
+  // ... 更新显示 ...
+  setTimeout(() => {
+    initializeNavScroll();
+  }, 50);
+}
+
+// 智能调整滚动位置
+function initializeNavScroll() {
+  // ... 计算参数 ...
+  if (currentScrollIndex + maxVisibleItems > totalItems) {
+    currentScrollIndex = Math.max(0, totalItems - maxVisibleItems);
+  }
+}
+```
 
 ## 未来扩展
 

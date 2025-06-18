@@ -61,4 +61,13 @@ Write-Host "手动测试建议:" -ForegroundColor Cyan
 Write-Host "1. 尝试将窗口高度调整到很小" -ForegroundColor Gray
 Write-Host "2. 观察滚动箭头的显示/隐藏逻辑" -ForegroundColor Gray
 Write-Host "3. 测试在不同分辨率下的表现" -ForegroundColor Gray
-Write-Host "4. 验证折叠/展开时的滚动重置" -ForegroundColor Gray 
+Write-Host "4. 验证折叠/展开时的滚动重置" -ForegroundColor Gray
+Write-Host "5. 测试患者信息更新时的滚动调整" -ForegroundColor Gray
+Write-Host ""
+
+Write-Host "关键修复测试:" -ForegroundColor Yellow
+Write-Host "✓ 启动时默认状态（患者信息较少）" -ForegroundColor Green
+Write-Host "✓ 滚动到最后一个导航按钮" -ForegroundColor Green
+Write-Host "✓ 通过API调用传入完整患者信息" -ForegroundColor Green
+Write-Host "✓ 确认最后一个导航按钮仍完整可见" -ForegroundColor Green
+Write-Host "✓ 无需手动切换折叠模式即可正常显示" -ForegroundColor Green 
