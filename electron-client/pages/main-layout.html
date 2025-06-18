@@ -159,10 +159,71 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 8px 0;
-      gap: 6px;
       border-bottom: 1px solid #34495e;
       -webkit-app-region: drag;
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+      /* 允许flex子元素收缩 */
+    }
+
+    /* 导航滚动容器 */
+    .nav-scroll-container {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+      gap: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 导航按钮容器 */
+    .nav-items-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.3s ease;
+      width: 100%;
+    }
+
+    /* 滚动箭头 */
+    .nav-scroll-arrow {
+      width: 52px;
+      height: 20px;
+      background: rgba(52, 73, 94, 0.9);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #ecf0f1;
+      transition: all 0.3s;
+      position: relative;
+      z-index: 10;
+      -webkit-app-region: no-drag;
+    }
+
+    .nav-scroll-arrow:hover {
+      background: rgba(52, 152, 219, 0.9);
+      transform: scale(1.05);
+    }
+
+    .nav-scroll-arrow.visible {
+      display: flex;
+    }
+
+    .nav-scroll-up {
+      margin-bottom: 4px;
+    }
+
+    .nav-scroll-down {
+      margin-top: 4px;
     }
 
     .nav-item {
@@ -442,26 +503,41 @@
 
     <!-- 中间导航区域 -->
     <div class="sidebar-nav">
-      <button class="nav-item active no-drag" data-page="diagnosis" data-tooltip="病情分析">
-        <div class="nav-icon">🔍</div>
-        <div class="nav-text">病情分析</div>
-      </button>
-      <button class="nav-item no-drag" data-page="record" data-tooltip="病历生成">
-        <div class="nav-icon">📝</div>
-        <div class="nav-text">病历生成</div>
-      </button>
-      <button class="nav-item no-drag" data-page="quality" data-tooltip="病历质控">
-        <div class="nav-icon">✅</div>
-        <div class="nav-text">病历质控</div>
-      </button>
-      <button class="nav-item no-drag" data-page="report" data-tooltip="报告解读">
-        <div class="nav-icon">📋</div>
-        <div class="nav-text">报告解读</div>
-      </button>
-      <button class="nav-item no-drag" data-page="chat" data-tooltip="聊天助手">
-        <div class="nav-icon">💬</div>
-        <div class="nav-text">聊天助手</div>
-      </button>
+      <!-- 向上滚动箭头 -->
+      <button class="nav-scroll-arrow nav-scroll-up no-drag" id="navScrollUp" title="向上滚动">▲</button>
+
+      <!-- 导航滚动容器 -->
+      <div class="nav-scroll-container" id="navScrollContainer">
+        <div class="nav-items-container" id="navItemsContainer">
+          <button class="nav-item active no-drag" data-page="diagnosis" data-tooltip="病情分析">
+            <div class="nav-icon">🔍</div>
+            <div class="nav-text">病情分析</div>
+          </button>
+          <button class="nav-item no-drag" data-page="record" data-tooltip="病历生成">
+            <div class="nav-icon">📝</div>
+            <div class="nav-text">病历生成</div>
+          </button>
+          <button class="nav-item no-drag" data-page="quality" data-tooltip="病历质控">
+            <div class="nav-icon">✅</div>
+            <div class="nav-text">病历质控</div>
+          </button>
+          <button class="nav-item no-drag" data-page="report" data-tooltip="报告解读">
+            <div class="nav-icon">📋</div>
+            <div class="nav-text">报告解读</div>
+          </button>
+          <button class="nav-item no-drag" data-page="chat" data-tooltip="聊天助手">
+            <div class="nav-icon">💬</div>
+            <div class="nav-text">聊天助手</div>
+          </button>
+          <button class="nav-item no-drag" data-page="documents" data-tooltip="文档管理">
+            <div class="nav-icon">📁</div>
+            <div class="nav-text">文档管理</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 向下滚动箭头 -->
+      <button class="nav-scroll-arrow nav-scroll-down no-drag" id="navScrollDown" title="向下滚动">▼</button>
     </div>
 
     <!-- 底部区域 -->
@@ -498,6 +574,11 @@
     let isCollapsed = false;
     let isPinned = true;
 
+    // 导航滚动相关变量
+    let currentScrollIndex = 0;
+    let maxVisibleItems = 0;
+    let totalItems = 0;
+
     // 患者和医生信息缓存
     let contextInfo = {
       patientId: '',
@@ -515,6 +596,12 @@
     document.addEventListener('DOMContentLoaded', function () {
       initializeEventListeners();
       updatePatientInfo();
+      initializeNavScroll();
+    });
+
+    // 窗口大小变化时重新计算
+    window.addEventListener('resize', () => {
+      setTimeout(initializeNavScroll, 100);
     });
 
     function initializeEventListeners() {
@@ -547,6 +634,16 @@
       const collapseBtn = document.getElementById('collapseBtn');
       if (collapseBtn) {
         collapseBtn.addEventListener('click', toggleCollapse);
+      }
+
+      // 导航滚动按钮
+      const navScrollUp = document.getElementById('navScrollUp');
+      const navScrollDown = document.getElementById('navScrollDown');
+      if (navScrollUp) {
+        navScrollUp.addEventListener('click', scrollNavUp);
+      }
+      if (navScrollDown) {
+        navScrollDown.addEventListener('click', scrollNavDown);
       }
     }
 
@@ -679,6 +776,9 @@
 
           const collapseBtn = document.getElementById('collapseBtn');
           collapseBtn.title = isCollapsed ? '展开' : '折叠';
+
+          // 折叠/展开后重新初始化滚动
+          setTimeout(initializeNavScroll, 100);
         }
       }
     }
@@ -748,6 +848,80 @@
           logoBtn.title = '点击取消置顶';
         }
       });
+    }
+
+    // 初始化导航滚动
+    function initializeNavScroll() {
+      const container = document.getElementById('navScrollContainer');
+      const itemsContainer = document.getElementById('navItemsContainer');
+      const navItems = document.querySelectorAll('.nav-item');
+
+      if (!container || !itemsContainer || navItems.length === 0) return;
+
+      totalItems = navItems.length;
+
+      // 计算容器高度和单个项目高度
+      const containerHeight = container.clientHeight;
+      const itemHeight = 68 + 6; // nav-item高度 + gap
+      maxVisibleItems = Math.floor(containerHeight / itemHeight);
+
+      console.log('导航滚动初始化:', {
+        containerHeight,
+        itemHeight,
+        maxVisibleItems,
+        totalItems
+      });
+
+      // 重置滚动位置
+      currentScrollIndex = 0;
+      updateNavScroll();
+    }
+
+    // 更新导航滚动显示
+    function updateNavScroll() {
+      const itemsContainer = document.getElementById('navItemsContainer');
+      const scrollUpBtn = document.getElementById('navScrollUp');
+      const scrollDownBtn = document.getElementById('navScrollDown');
+
+      if (!itemsContainer) return;
+
+      // 计算滚动偏移
+      const itemHeight = 68 + 6; // nav-item高度 + gap
+      const translateY = -currentScrollIndex * itemHeight;
+      itemsContainer.style.transform = `translateY(${translateY}px)`;
+
+      // 更新滚动按钮显示状态
+      if (scrollUpBtn) {
+        scrollUpBtn.classList.toggle('visible', currentScrollIndex > 0);
+      }
+
+      if (scrollDownBtn) {
+        const canScrollDown = currentScrollIndex + maxVisibleItems < totalItems;
+        scrollDownBtn.classList.toggle('visible', canScrollDown);
+      }
+
+      console.log('导航滚动更新:', {
+        currentScrollIndex,
+        translateY,
+        canScrollUp: currentScrollIndex > 0,
+        canScrollDown: currentScrollIndex + maxVisibleItems < totalItems
+      });
+    }
+
+    // 向上滚动
+    function scrollNavUp() {
+      if (currentScrollIndex > 0) {
+        currentScrollIndex--;
+        updateNavScroll();
+      }
+    }
+
+    // 向下滚动
+    function scrollNavDown() {
+      if (currentScrollIndex + maxVisibleItems < totalItems) {
+        currentScrollIndex++;
+        updateNavScroll();
+      }
     }
 
     // 暴露全局API供外部调用
