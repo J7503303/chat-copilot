@@ -165,6 +165,26 @@ http://localhost:19876/api/v1/navigate?doctor_name=张医生&patient_name=李患
 http://localhost:19876/api/v1/navigate?doctor_name=%E5%BC%A0%E5%8C%BB%E7%94%9F&patient_name=%E6%9D%8E%E6%82%A3%E8%80%85
 ```
 
+## 窗口置顶功能
+
+### 自动置顶机制
+- API调用时窗口会自动临时置顶（3秒）
+- 利用现有Logo置顶功能，确保兼容性
+- 智能检测当前置顶状态，避免重复操作
+- 3秒后自动取消置顶，不影响用户设置
+
+### 智能处理
+- 兼容用户手动设置的置顶状态
+- 自动恢复最小化的窗口
+- 支持从任何状态激活窗口
+- 与界面Logo置顶按钮完全兼容
+
+### 测试置顶功能
+运行测试脚本验证窗口置顶效果：
+```powershell
+.\test-window-focus.ps1
+```
+
 ## 安全说明
 - HTTP服务只监听 `localhost`，外部网络无法访问
 - 未实现身份验证，仅适用于本地应用集成

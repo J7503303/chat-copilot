@@ -44,7 +44,7 @@ function createWindow() {
         minimizable: true, // 允许最小化
         maximizable: false,
         closable: true, // 允许关闭
-        alwaysOnTop: false,
+        alwaysOnTop: true,
         skipTaskbar: false, // 在任务栏显示
         transparent: false,
         titleBarStyle: 'hidden'
@@ -252,13 +252,13 @@ function showWindow() {
             adjustWindowSize();
         }
 
-        mainWindow.show();
-        mainWindow.focus();
-
-        // 如果窗口被最小化，恢复它
+        // 如果窗口被最小化，先恢复它
         if (mainWindow.isMinimized()) {
             mainWindow.restore();
         }
+
+        mainWindow.show();
+        mainWindow.focus();
 
         // 隐藏悬浮窗口
         hideFloatingWindow();
@@ -327,17 +327,17 @@ function toggleCompactMode() {
 function switchTab(tabName) {
     currentTab = tabName;
 
-    // 确保窗口可见（但不重置位置）
+    // 确保窗口可见
     if (mainWindow) {
+        // 如果窗口被最小化，先恢复它
+        if (mainWindow.isMinimized()) {
+            mainWindow.restore();
+        }
+
         if (!mainWindow.isVisible()) {
             mainWindow.show();
         }
         mainWindow.focus();
-
-        // 如果窗口被最小化，恢复它
-        if (mainWindow.isMinimized()) {
-            mainWindow.restore();
-        }
 
         // 隐藏悬浮窗口
         hideFloatingWindow();
@@ -347,8 +347,6 @@ function switchTab(tabName) {
     if (mainWindow && mainWindow.webContents) {
         mainWindow.webContents.send('tab-params', { tabName });
     }
-
-    // 移除通知提示，保持静默切换
 }
 
 // 获取Tab显示名称
@@ -523,8 +521,17 @@ function createHttpServer() {
                 return value === undefined || value === '' ? undefined : value;
             }));
 
-            // 显示主窗口
+            // 显示主窗口并确保置顶
             showWindow();
+
+            // API调用时确保窗口置顶并同步Logo状态
+            if (mainWindow) {
+                mainWindow.setAlwaysOnTop(true);
+                // 通知前端更新Logo状态为置顶
+                if (mainWindow.webContents) {
+                    mainWindow.webContents.send('api-pin-status', { pinned: true });
+                }
+            }
 
             // 切换页面（如果指定了页面）
             if (page) {

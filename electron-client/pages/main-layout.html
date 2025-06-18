@@ -496,7 +496,7 @@
   <script>
     let currentPage = 'diagnosis';
     let isCollapsed = false;
-    let isPinned = false;
+    let isPinned = true;
 
     // 患者和医生信息缓存
     let contextInfo = {
@@ -533,6 +533,9 @@
 
       if (logoBtn) {
         logoBtn.addEventListener('click', togglePin);
+        // 设置初始置顶状态
+        logoBtn.classList.add('pinned');
+        logoBtn.title = '点击取消置顶';
       }
 
       // 导航按钮
@@ -729,6 +732,20 @@
         // 切换页面（如果指定了页面）
         if (data.page && data.page !== currentPage) {
           switchPage(data.page);
+        }
+      });
+    }
+
+    // 监听API调用的置顶状态变化
+    if (window.electronAPI && window.electronAPI.onApiPinStatus) {
+      window.electronAPI.onApiPinStatus((data) => {
+        console.log('API调用更新置顶状态:', data);
+
+        const logoBtn = document.getElementById('logoBtn');
+        if (logoBtn && data.pinned) {
+          isPinned = true;
+          logoBtn.classList.add('pinned');
+          logoBtn.title = '点击取消置顶';
         }
       });
     }
