@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能聊天</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .webapp-container {
+      width: 100%;
+      height: 100vh;
+      border: none;
+      background: white;
+    }
+
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #666;
+      background: #f5f5f5;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #0078d4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 16px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .error-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #d13438;
+      background: #f5f5f5;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .error-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .error-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .retry-btn {
+      margin-top: 16px;
+      padding: 12px 24px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .retry-btn:hover {
+      background: #106ebe;
+    }
+
+    .start-webapp-btn {
+      margin-left: 12px;
+      padding: 12px 24px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .start-webapp-btn:hover {
+      background: #059669;
+    }
+
+    .status-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      border-radius: 20px;
+      font-size: 12px;
+      z-index: 1000;
+      display: none;
+    }
+
+    .status-indicator.success {
+      background: rgba(16, 185, 129, 0.9);
+    }
+
+    .status-indicator.error {
+      background: rgba(209, 52, 56, 0.9);
+    }
+
+    .status-indicator.warning {
+      background: rgba(245, 158, 11, 0.9);
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 状态指示器 -->
+  <div id="statusIndicator" class="status-indicator"></div>
+
+  <!-- 加载状态 -->
+  <div id="loadingContainer" class="loading-container">
+    <div class="loading-spinner"></div>
+    <div>正在加载聊天界面...</div>
+  </div>
+
+  <!-- 错误状态 -->
+  <div id="errorContainer" class="error-container">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">无法连接到聊天服务</div>
+    <div class="error-message">
+      请确保 webapp 服务正在运行在 http://localhost:8440<br>
+      您可以手动启动 webapp 服务，或者点击下方按钮自动启动
+    </div>
+    <div>
+      <button class="retry-btn" onclick="retryConnection()">重试连接</button>
+      <button class="start-webapp-btn" onclick="startWebappService()">启动 Webapp</button>
+    </div>
+    <div style="margin-top: 20px; font-size: 12px; color: #999;">
+      重试次数: <span id="retryCount">0</span> / 3
+    </div>
+  </div>
+
+  <!-- webapp iframe -->
+  <iframe id="webappFrame" class="webapp-container" src="http://localhost:8440" style="display: none;"
+    onload="handleIframeLoad()" onerror="handleIframeError()">
+  </iframe>
+
+  <script>
+    let retryCount = 0;
+    const maxRetries = 3;
+    let webappCheckInterval = null;
+
+    // 显示状态指示器
+    function showStatus(message, type = 'info', duration = 3000) {
+      const indicator = document.getElementById('statusIndicator');
+      indicator.textContent = message;
+      indicator.className = `status-indicator ${type}`;
+      indicator.style.display = 'block';
+
+      if (duration > 0) {
+        setTimeout(() => {
+          indicator.style.display = 'none';
+        }, duration);
+      }
+    }
+
+    function handleIframeLoad() {
+      console.log('Webapp 加载成功');
+      showStatus('聊天界面加载成功', 'success');
+
+      // 隐藏加载状态，显示iframe
+      document.getElementById('loadingContainer').style.display = 'none';
+      document.getElementById('errorContainer').style.display = 'none';
+      document.getElementById('webappFrame').style.display = 'block';
+
+      // 重置重试计数
+      retryCount = 0;
+      updateRetryCount();
+
+      // 清除检查定时器
+      if (webappCheckInterval) {
+        clearInterval(webappCheckInterval);
+        webappCheckInterval = null;
+      }
+
+      // 传递上下文信息到webapp
+      setTimeout(() => {
+        sendContextToWebapp();
+      }, 1000);
+    }
+
+    function handleIframeError() {
+      console.error('Webapp 加载失败');
+      showError();
+    }
+
+    function showError() {
+      document.getElementById('loadingContainer').style.display = 'none';
+      document.getElementById('webappFrame').style.display = 'none';
+      document.getElementById('errorContainer').style.display = 'flex';
+      updateRetryCount();
+      showStatus('连接失败', 'error', 0);
+    }
+
+    function updateRetryCount() {
+      document.getElementById('retryCount').textContent = retryCount;
+    }
+
+    function retryConnection() {
+      if (retryCount < maxRetries) {
+        retryCount++;
+        console.log(`重试连接 webapp (${retryCount}/${maxRetries})`);
+        showStatus(`正在重试连接... (${retryCount}/${maxRetries})`, 'warning', 0);
+
+        // 重置状态
+        document.getElementById('errorContainer').style.display = 'none';
+        document.getElementById('loadingContainer').style.display = 'flex';
+
+        // 重新加载iframe
+        const iframe = document.getElementById('webappFrame');
+        iframe.src = 'http://localhost:8440?retry=' + retryCount + '&t=' + Date.now();
+        updateRetryCount();
+      } else {
+        showStatus('重试次数已达上限', 'error');
+        alert('连接失败次数过多，请检查 webapp 服务是否正常运行\n\n请在终端中运行以下命令启动服务：\ncd webapp\nyarn install\nyarn start');
+      }
+    }
+
+    function startWebappService() {
+      showStatus('正在尝试启动 Webapp 服务...', 'warning', 0);
+
+      // 通知主进程启动webapp服务
+      if (window.electronAPI && window.electronAPI.startWebappService) {
+        window.electronAPI.startWebappService()
+          .then(result => {
+            if (result.success) {
+              showStatus('Webapp 服务启动成功，正在连接...', 'success');
+              setTimeout(() => {
+                retryConnection();
+              }, 3000);
+            } else {
+              showStatus('启动失败: ' + result.error, 'error');
+            }
+          })
+          .catch(error => {
+            showStatus('启动失败: ' + error.message, 'error');
+          });
+      } else {
+        // 如果没有API支持，提供手动启动指导
+        alert('请手动启动 webapp 服务：\n\n1. 打开终端\n2. 进入 webapp 目录\n3. 运行 yarn install\n4. 运行 yarn start\n5. 等待服务启动后点击重试');
+      }
+    }
+
+    // 向webapp传递上下文信息
+    function sendContextToWebapp() {
+      const iframe = document.getElementById('webappFrame');
+      if (iframe && iframe.contentWindow) {
+        try {
+          // 获取父页面的上下文信息
+          const contextInfo = getContextInfo();
+
+          // 发送消息到webapp
+          iframe.contentWindow.postMessage({
+            type: 'CONTEXT_UPDATE',
+            data: contextInfo
+          }, 'http://localhost:8440');
+
+          console.log('上下文信息已发送到webapp:', contextInfo);
+          showStatus('上下文信息已同步', 'success');
+        } catch (error) {
+          console.warn('发送上下文信息失败:', error);
+        }
+      }
+    }
+
+    // 获取上下文信息
+    function getContextInfo() {
+      try {
+        // 尝试从父窗口获取上下文信息
+        if (window.parent && window.parent.getContextInfo) {
+          return window.parent.getContextInfo();
+        }
+
+        // 如果无法获取，返回默认信息
+        return {
+          patientId: '',
+          patientName: '未知患者',
+          doctorName: '医生',
+          source: 'electron-app',
+          timestamp: new Date().toISOString()
+        };
+      } catch (error) {
+        console.warn('获取上下文信息失败:', error);
+        return {
+          source: 'electron-app',
+          timestamp: new Date().toISOString()
+        };
+      }
+    }
+
+    // 监听来自webapp的消息
+    window.addEventListener('message', function (event) {
+      // 验证消息来源
+      if (event.origin !== 'http://localhost:8440') {
+        console.warn('收到未授权来源的消息:', event.origin);
+        return;
+      }
+
+      console.log('收到webapp消息:', event.data);
+
+      const { type, data } = event.data;
+
+      switch (type) {
+        case 'WEBAPP_READY':
+          console.log('Webapp 已准备就绪');
+          showStatus('聊天服务已就绪', 'success');
+          sendContextToWebapp();
+          break;
+
+        case 'NAVIGATE_REQUEST':
+          // webapp请求导航到其他页面
+          console.log('Webapp 请求导航到:', data.page);
+          if (window.parent && window.parent.switchPage) {
+            window.parent.switchPage(data.page);
+          }
+          break;
+
+        case 'CONTEXT_REQUEST':
+          // webapp请求上下文信息
+          console.log('Webapp 请求上下文信息');
+          sendContextToWebapp();
+          break;
+
+        case 'ERROR':
+          // webapp报告错误
+          console.error('Webapp 报告错误:', data);
+          showStatus('聊天服务错误: ' + data.message, 'error');
+          break;
+
+        case 'STATUS':
+          // webapp状态更新
+          console.log('Webapp 状态更新:', data);
+          showStatus(data.message, data.type || 'info');
+          break;
+      }
+    });
+
+    // 页面卸载时的清理
+    window.addEventListener('beforeunload', function () {
+      console.log('Chat页面即将卸载');
+      if (webappCheckInterval) {
+        clearInterval(webappCheckInterval);
+      }
+    });
+
+    // 检查webapp服务可用性
+    function checkWebappService() {
+      return fetch('http://localhost:8440', {
+        method: 'GET',
+        mode: 'no-cors', // 避免CORS问题
+        cache: 'no-cache'
+      })
+        .then(response => {
+          console.log('Webapp 服务检查成功');
+          return true;
+        })
+        .catch(error => {
+          console.log('Webapp 服务不可用:', error.message);
+          return false;
+        });
+    }
+
+    // 定期检查webapp服务状态
+    function startWebappHealthCheck() {
+      webappCheckInterval = setInterval(async () => {
+        const isAvailable = await checkWebappService();
+        if (!isAvailable && document.getElementById('webappFrame').style.display === 'block') {
+          console.warn('Webapp 服务意外中断');
+          showStatus('聊天服务连接中断', 'error');
+          showError();
+        }
+      }, 30000); // 每30秒检查一次
+    }
+
+    // 初始化
+    async function initialize() {
+      console.log('Chat页面正在初始化...');
+      showStatus('正在连接聊天服务...', 'warning', 0);
+
+      // 初始检查webapp服务
+      setTimeout(async () => {
+        const isAvailable = await checkWebappService();
+        if (!isAvailable) {
+          console.error('初始检查: Webapp 服务不可用');
+          setTimeout(showError, 1000); // 1秒后显示错误
+        } else {
+          console.log('初始检查: Webapp 服务可用');
+          // 启动健康检查
+          startWebappHealthCheck();
+        }
+      }, 1000);
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', initialize);
+
+    // 对外接口 - 供第三方系统调用
+    window.ChatIntegration = {
+      // 发送消息到webapp
+      sendMessage: function (message, context = {}) {
+        const iframe = document.getElementById('webappFrame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'SEND_MESSAGE',
+            data: { message, context }
+          }, 'http://localhost:8440');
+          return { success: true, message: '消息已发送' };
+        }
+        return { success: false, error: 'Webapp 未就绪' };
+      },
+
+      // 更新上下文信息
+      updateContext: function (contextInfo) {
+        sendContextToWebapp();
+        return { success: true, message: '上下文已更新' };
+      },
+
+      // 获取webapp状态
+      getStatus: function () {
+        const iframe = document.getElementById('webappFrame');
+        return {
+          loaded: iframe && iframe.style.display === 'block',
+          retryCount: retryCount,
+          maxRetries: maxRetries
+        };
+      },
+
+      // 手动重试连接
+      retry: function () {
+        retryConnection();
+        return { success: true, message: '正在重试连接' };
+      }
+    };
+
+    console.log('Chat页面已加载，集成接口已就绪');
+  </script>
+</body>
+
+</html>

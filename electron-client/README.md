@@ -108,7 +108,7 @@ const APP_CONFIG = {
 
 #### 切换Tab
 ```http
-POST http://localhost:3000/api/switch-tab
+POST http://localhost:8440/api/switch-tab
 Content-Type: application/json
 
 {
@@ -123,12 +123,12 @@ Content-Type: application/json
 
 #### 获取状态
 ```http
-GET http://localhost:3000/api/status
+GET http://localhost:8440/api/status
 ```
 
 #### 控制窗口
 ```http
-POST http://localhost:3000/api/window/toggle
+POST http://localhost:8440/api/window/toggle
 ```
 
 ### JavaScript接口
