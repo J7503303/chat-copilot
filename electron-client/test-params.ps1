@@ -24,11 +24,7 @@ try {
     $result = $response.Content | ConvertFrom-Json
     
     if ($result.success) {
-        Write-Host "✓ 基本参数测试成功" -ForegroundColor Green
-        Write-Host "  当前页面: $($result.data.current_page)" -ForegroundColor Gray
-        Write-Host "  医生信息: $($result.data.received_params.doctor.name)" -ForegroundColor Gray
-        Write-Host "  科室信息: $($result.data.received_params.department.name)" -ForegroundColor Gray
-        Write-Host "  患者信息: $($result.data.received_params.patient.name)" -ForegroundColor Gray
+        Write-Host "✓ 基本参数测试成功: $($result.message)" -ForegroundColor Green
     } else {
         Write-Host "✗ 基本参数测试失败: $($result.error)" -ForegroundColor Red
     }
@@ -65,22 +61,7 @@ try {
     $result = $response.Content | ConvertFrom-Json
     
     if ($result.success) {
-        Write-Host "✓ 完整参数测试成功" -ForegroundColor Green
-        Write-Host "  当前页面: $($result.data.current_page)" -ForegroundColor Gray
-        Write-Host "  窗口模式: $($result.data.window_mode)" -ForegroundColor Gray
-        Write-Host "  接收参数详情:" -ForegroundColor Gray
-        
-        if ($result.data.received_params.doctor) {
-            Write-Host "    医生 - ID: $($result.data.received_params.doctor.id), 编码: $($result.data.received_params.doctor.code), 姓名: $($result.data.received_params.doctor.name)" -ForegroundColor DarkGray
-        }
-        
-        if ($result.data.received_params.department) {
-            Write-Host "    科室 - ID: $($result.data.received_params.department.id), 编码: $($result.data.received_params.department.code), 名称: $($result.data.received_params.department.name)" -ForegroundColor DarkGray
-        }
-        
-        if ($result.data.received_params.patient) {
-            Write-Host "    患者 - ID: $($result.data.received_params.patient.id), 姓名: $($result.data.received_params.patient.name), 床位: $($result.data.received_params.patient.bed), 性别: $($result.data.received_params.patient.sex), 年龄: $($result.data.received_params.patient.age)" -ForegroundColor DarkGray
-        }
+        Write-Host "✓ 完整参数测试成功: $($result.message)" -ForegroundColor Green
     } else {
         Write-Host "✗ 完整参数测试失败: $($result.error)" -ForegroundColor Red
     }
@@ -111,10 +92,7 @@ try {
     $result = $response.Content | ConvertFrom-Json
     
     if ($result.success) {
-        Write-Host "✓ 中文参数测试成功" -ForegroundColor Green
-        Write-Host "  医生: $($result.data.received_params.doctor.name)" -ForegroundColor Gray
-        Write-Host "  科室: $($result.data.received_params.department.name)" -ForegroundColor Gray
-        Write-Host "  患者: $($result.data.received_params.patient.name) ($($result.data.received_params.patient.sex), $($result.data.received_params.patient.age)岁, $($result.data.received_params.patient.bed))" -ForegroundColor Gray
+        Write-Host "✓ 中文参数测试成功: $($result.message)" -ForegroundColor Green
     } else {
         Write-Host "✗ 中文参数测试失败: $($result.error)" -ForegroundColor Red
     }
@@ -142,8 +120,7 @@ try {
     $result = $response.Content | ConvertFrom-Json
     
     if ($result.success) {
-        Write-Host "✓ 患者信息测试成功" -ForegroundColor Green
-        Write-Host "  患者: $($result.data.received_params.patient.name) ($($result.data.received_params.patient.sex), $($result.data.received_params.patient.age)岁, 床位$($result.data.received_params.patient.bed))" -ForegroundColor Gray
+        Write-Host "✓ 患者信息测试成功: $($result.message)" -ForegroundColor Green
     } else {
         Write-Host "✗ 患者信息测试失败: $($result.error)" -ForegroundColor Red
     }
@@ -163,9 +140,7 @@ try {
     $result = $response.Content | ConvertFrom-Json
     
     if ($result.success) {
-        Write-Host "✓ 清空信息测试成功" -ForegroundColor Green
-        Write-Host "  当前页面: $($result.data.current_page)" -ForegroundColor Gray
-        Write-Host "  接收参数: 无（应该清空之前的信息）" -ForegroundColor Gray
+        Write-Host "✓ 清空信息测试成功: $($result.message)" -ForegroundColor Green
     } else {
         Write-Host "✗ 清空信息测试失败: $($result.error)" -ForegroundColor Red
     }

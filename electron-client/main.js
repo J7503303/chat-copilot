@@ -348,14 +348,7 @@ function switchTab(tabName) {
         mainWindow.webContents.send('tab-params', { tabName });
     }
 
-    // 显示通知
-    if (tray) {
-        tray.displayBalloon({
-            iconType: 'info',
-            title: '页面切换',
-            content: `已切换到：${getTabDisplayName(tabName)}`
-        });
-    }
+    // 移除通知提示，保持静默切换
 }
 
 // 获取Tab显示名称
@@ -463,39 +456,7 @@ function createHttpServer() {
     server.use(cors());
     server.use(express.json());
 
-    // 第三方系统调用接口
-    server.post('/api/switch-tab', (req, res) => {
-        const { tabName, params = {}, windowMode } = req.body;
-
-        try {
-            // 切换Tab
-            switchTab(tabName);
-
-            // 设置窗口模式
-            if (windowMode === 'compact' && !isCompactMode) {
-                toggleCompactMode();
-            } else if (windowMode === 'full' && isCompactMode) {
-                toggleCompactMode();
-            }
-
-            // 向页面发送参数
-            if (mainWindow && Object.keys(params).length > 0) {
-                mainWindow.webContents.send('tab-params', { tabName, params });
-            }
-
-            res.json({
-                success: true,
-                currentTab: tabName,
-                windowMode: isCompactMode ? 'compact' : 'full',
-                message: `已切换到${getTabDisplayName(tabName)}`
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        }
-    });
+    // 移除了 /api/switch-tab 接口 - 功能已由 /api/v1/navigate 替代
 
     // 获取当前状态
     server.get('/api/status', (req, res) => {
@@ -506,19 +467,7 @@ function createHttpServer() {
         });
     });
 
-    // 控制窗口显示/隐藏
-    server.post('/api/window/toggle', (req, res) => {
-        if (mainWindow.isVisible()) {
-            mainWindow.hide();
-        } else {
-            showWindow();
-        }
-
-        res.json({
-            success: true,
-            isVisible: mainWindow.isVisible()
-        });
-    });
+    // 移除了 /api/window/toggle 接口 - 窗口控制已集成到 /api/v1/navigate 中
 
     // 统一的GET接口 - 支持页面切换和参数传递
     server.get('/api/v1/navigate', (req, res) => {
@@ -600,15 +549,9 @@ function createHttpServer() {
                 });
             }
 
-            // 返回成功响应
+            // 返回简化的成功响应
             res.json({
                 success: true,
-                data: {
-                    current_page: page || currentTab,
-                    window_mode: isCompactMode ? 'compact' : 'full',
-                    is_visible: mainWindow.isVisible(),
-                    received_params: cleanParams
-                },
                 message: `已切换到${getTabDisplayName(page || currentTab)}`
             });
 

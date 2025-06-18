@@ -59,43 +59,11 @@ const APP_CONFIG = {
   ```json
   {
       "success": true,
-      "data": {
-          "current_page": "chat",
-          "window_mode": "full",
-          "is_visible": true,
-          "received_params": {
-              "doctor": {
-                  "id": "D001",
-                  "name": "张医生"
-              },
-              "department": {
-                  "name": "内科"
-              },
-              "patient": {
-                  "id": "P001",
-                  "name": "李患者",
-                  "bed": "101",
-                  "sex": "男",
-                  "age": "45"
-              }
-          }
-      },
       "message": "已切换到智能问诊"
   }
   ```
 
-### 2. 切换标签页 (POST方式)
-- **URL**: `POST /api/switch-tab`
-- **参数**:
-  ```json
-  {
-      "tabName": "chat|diagnosis|report|record|quality|documents",
-      "params": {},
-      "windowMode": "compact|full"
-  }
-  ```
-
-### 3. 获取当前状态
+### 2. 获取当前状态
 - **URL**: `GET /api/status`
 - **响应**:
   ```json
@@ -106,15 +74,7 @@ const APP_CONFIG = {
   }
   ```
 
-### 4. 切换窗口显示/隐藏
-- **URL**: `POST /api/window/toggle`
-- **响应**:
-  ```json
-  {
-      "success": true,
-      "isVisible": true
-  }
-  ```
+
 
 ## 错误处理
 

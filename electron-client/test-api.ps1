@@ -23,14 +23,13 @@ try {
 
 Write-Host ""
 
-# 测试2: 测试导航接口 - 基本调用
+# 测试2: 测试导航接口 - 基本调用 (主要接口)
 Write-Host "2. 测试导航接口 - 基本调用..." -ForegroundColor Yellow
 try {
     $navUrl = "$baseUrl/api/v1/navigate?page=chat"
     $response = Invoke-WebRequest -Uri $navUrl -Method GET -TimeoutSec 5
     $result = $response.Content | ConvertFrom-Json
     Write-Host "✓ 基本导航成功" -ForegroundColor Green
-    Write-Host "  切换到页面: $($result.data.current_page)" -ForegroundColor Cyan
     Write-Host "  返回消息: $($result.message)" -ForegroundColor Cyan
 } catch {
     Write-Host "✗ 基本导航测试失败: $($_.Exception.Message)" -ForegroundColor Red
@@ -60,12 +59,7 @@ try {
     $response = Invoke-WebRequest -Uri $fullUrl -Method GET -TimeoutSec 5
     $result = $response.Content | ConvertFrom-Json
     Write-Host "✓ 完整参数导航成功" -ForegroundColor Green
-    Write-Host "  切换到页面: $($result.data.current_page)" -ForegroundColor Cyan
-    Write-Host "  窗口模式: $($result.data.window_mode)" -ForegroundColor Cyan
-    Write-Host "  接收到的参数:" -ForegroundColor Cyan
-    Write-Host "    医生: $($result.data.received_params.doctor.name) (ID: $($result.data.received_params.doctor.id))" -ForegroundColor Gray
-    Write-Host "    科室: $($result.data.received_params.department.name)" -ForegroundColor Gray
-    Write-Host "    患者: $($result.data.received_params.patient.name) (床位: $($result.data.received_params.patient.bed))" -ForegroundColor Gray
+    Write-Host "  返回消息: $($result.message)" -ForegroundColor Cyan
 } catch {
     Write-Host "✗ 完整参数导航测试失败: $($_.Exception.Message)" -ForegroundColor Red
 }
@@ -89,6 +83,8 @@ try {
 Write-Host ""
 Write-Host "=== 测试完成 ===" -ForegroundColor Green
 Write-Host ""
-Write-Host "如需手动测试，可以在浏览器中访问以下URL:" -ForegroundColor Yellow
-Write-Host "基本状态: $baseUrl/api/status" -ForegroundColor Cyan
-Write-Host "导航测试: $baseUrl/api/v1/navigate?page=chat&doctor_name=测试医生&patient_name=测试患者" -ForegroundColor Cyan 
+Write-Host "当前可用的API接口:" -ForegroundColor Yellow
+Write-Host "1. 状态查询: $baseUrl/api/status" -ForegroundColor Cyan
+Write-Host "2. 导航接口: $baseUrl/api/v1/navigate?page=chat&doctor_name=测试医生&patient_name=测试患者" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "注意: /api/switch-tab 和 /api/window/toggle 接口已移除，统一使用 /api/v1/navigate" -ForegroundColor Yellow 
