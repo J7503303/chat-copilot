@@ -16,6 +16,26 @@
 - 支持不同分辨率的屏幕
 - 窗口切换和调整时自动重新计算
 
+### 屏幕空间充分利用
+为了最大化屏幕空间利用率，应用程序使用以下策略：
+
+```javascript
+// 使用完整屏幕尺寸而非工作区尺寸
+const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
+
+// 边距设置为0，充分利用屏幕高度
+const APP_CONFIG = {
+    marginTop: 0,     // 贴近屏幕顶部
+    marginBottom: 0   // 贴近屏幕底部
+};
+```
+
+**优化效果**:
+- 窗口高度几乎等于屏幕高度
+- 不受任务栏等系统UI限制
+- 适配各种分辨率和DPI设置
+- 最大化可视区域利用率
+
 ### 自定义边距
 如需调整窗口与屏幕边缘的距离，可修改配置：
 ```javascript

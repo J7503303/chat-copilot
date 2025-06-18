@@ -15,8 +15,8 @@ const APP_CONFIG = {
     compactSize: { width: 60 }, // 折叠时只显示导航栏
     fullSize: { width: 540 }, // 展开时显示完整界面
     httpPort: 19876, // 改为不易冲突的端口
-    marginTop: 40, // 距离屏幕顶部的边距
-    marginBottom: 40 // 距离屏幕底部的边距
+    marginTop: 0, // 距离屏幕顶部的边距（设为0以充分利用屏幕）
+    marginBottom: 0 // 距离屏幕底部的边距（设为0以充分利用屏幕）
 };
 
 // 创建主窗口
@@ -24,9 +24,10 @@ function createWindow() {
     // 获取屏幕尺寸
     const { screen } = require('electron');
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    // 使用完整屏幕尺寸而非工作区尺寸，以充分利用屏幕空间
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
 
-    // 计算窗口高度（适应屏幕高度，留出边距）
+    // 计算窗口高度（充分利用屏幕高度）
     const windowHeight = screenHeight - APP_CONFIG.marginTop - APP_CONFIG.marginBottom;
 
     mainWindow = new BrowserWindow({
@@ -272,7 +273,8 @@ function adjustWindowSize() {
     if (mainWindow) {
         const { screen } = require('electron');
         const primaryDisplay = screen.getPrimaryDisplay();
-        const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+        // 使用完整屏幕尺寸以充分利用屏幕空间
+        const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
         const windowHeight = screenHeight - APP_CONFIG.marginTop - APP_CONFIG.marginBottom;
 
         const currentBounds = mainWindow.getBounds();
@@ -295,7 +297,8 @@ function showFloatingWindow() {
         // 获取屏幕尺寸，设置默认位置（右上角）
         const { screen } = require('electron');
         const primaryDisplay = screen.getPrimaryDisplay();
-        const { width, height } = primaryDisplay.workAreaSize;
+        // 使用完整屏幕尺寸以充分利用屏幕空间
+        const { width, height } = primaryDisplay.size;
 
         floatingWindow.setPosition(width - 120, 50);
     }
@@ -647,7 +650,8 @@ ipcMain.handle('window-pin', async () => {
 ipcMain.handle('toggle-sidebar', async () => {
     const { screen } = require('electron');
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    // 使用完整屏幕尺寸以充分利用屏幕空间
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.size;
     const windowHeight = screenHeight - APP_CONFIG.marginTop - APP_CONFIG.marginBottom;
 
     if (mainWindow) {
