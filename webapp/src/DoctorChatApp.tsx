@@ -222,11 +222,11 @@ const DoctorChatApp: React.FC = () => {
                 setHubConnection(connection);
                 isConnecting = false;
 
-                // 监听消息接收
+                // 监听消息接收 - 完整的新消息
                 connection.on('ReceiveMessage', (chatId: string, senderId: string, message: SignalRMessage) => {
-                    console.log('📥 SignalR收到消息:', { chatId, senderId, message });
+                    console.log('📥 SignalR收到完整消息:', { chatId, senderId, message });
                     
-                    if (chatSession && chatId === chatSession.id && message.authorRole === AuthorRoles.Bot) {
+                    if (message.authorRole === AuthorRoles.Bot) {
                         const newMessage: Message = {
                             id: message.id ?? `signalr-${Date.now()}`,
                             content: message.content,
@@ -237,26 +237,73 @@ const DoctorChatApp: React.FC = () => {
                         };
                         
                         setMessages(prev => {
-                            // 避免重复添加相同的消息
-                            const exists = prev.some(m => m.id === newMessage.id);
-                            if (!exists) {
-                                return [...prev, newMessage];
+                            // 检查是否已经存在相同ID的消息，避免重复
+                            const existingIndex = prev.findIndex(m => m.id === newMessage.id);
+                            if (existingIndex >= 0) {
+                                const updated = [...prev];
+                                updated[existingIndex] = newMessage;
+                                return updated;
                             }
-                            return prev;
+                            return [...prev, newMessage];
                         });
-                        setIsLoading(false);
+                        
+                        setIsLoading(false); // 收到完整消息后停止加载状态
                     }
                 });
 
+                // 监听消息更新 - 流式输出的增量更新
                 connection.on('ReceiveMessageUpdate', (message: SignalRMessage) => {
                     console.log('📥 SignalR消息更新:', message);
                     
-                    if (chatSession && message.chatId === chatSession.id) {
-                        setMessages(prev => prev.map(m => 
-                            m.id === message.id 
-                                ? { ...m, content: message.content }
-                                : m
-                        ));
+                    if (message.authorRole === AuthorRoles.Bot) {
+                        setMessages(prev => {
+                            const updatedMessages = [...prev];
+                            
+                            // 优先通过ID查找消息
+                            let targetIndex = -1;
+                            if (message.id) {
+                                targetIndex = updatedMessages.findIndex(m => m.id === message.id);
+                            }
+                            
+                            // 如果没有找到，查找最后一个Bot消息
+                            if (targetIndex === -1) {
+                                for (let i = updatedMessages.length - 1; i >= 0; i--) {
+                                    if (updatedMessages[i].isBot) {
+                                        targetIndex = i;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (targetIndex >= 0) {
+                                updatedMessages[targetIndex] = {
+                                    ...updatedMessages[targetIndex],
+                                    content: message.content,
+                                    timestamp: message.timestamp || updatedMessages[targetIndex].timestamp,
+                                };
+                            } else {
+                                // 如果没有找到现有消息，创建新消息
+                                const newMessage: Message = {
+                                    id: message.id || `update-${Date.now()}`,
+                                    content: message.content,
+                                    isBot: true,
+                                    timestamp: message.timestamp || Date.now(),
+                                    type: message.type,
+                                    authorRole: message.authorRole
+                                };
+                                updatedMessages.push(newMessage);
+                            }
+                            
+                            return updatedMessages;
+                        });
+                    }
+                });
+
+                // 监听Bot响应状态更新
+                connection.on('ReceiveBotResponseStatus', (chatId: string, status: string) => {
+                    console.log('📊 收到Bot响应状态:', { chatId, status });
+                    if (status.includes('Generating bot response')) {
+                        setIsLoading(true);
                     }
                 });
 
@@ -298,6 +345,21 @@ const DoctorChatApp: React.FC = () => {
             console.log('⚠️ 跳过SignalR组加入，连接状态:', hubConnection?.state || 'null');
         }
     }, [hubConnection]);
+
+    // 自动保存聊天历史（当消息更新时）
+    useEffect(() => {
+        if (doctorInfo && chatSession && messages.length > 0) {
+            const storageKey = getStorageKey(doctorInfo.id);
+            const chatData: ChatHistoryData = {
+                doctorInfo,
+                messages,
+                chatSession,
+                timestamp: Date.now(),
+            };
+            localStorage.setItem(storageKey, JSON.stringify(chatData));
+            console.log('💾 自动保存聊天历史，消息数量:', messages.length);
+        }
+    }, [messages, doctorInfo, chatSession]); // 当消息、医生信息或会话变化时自动保存
 
     // 设置用户信息（如果还没有设置）
     useEffect(() => {
@@ -585,28 +647,45 @@ const DoctorChatApp: React.FC = () => {
             authorRole: AuthorRoles.User,
         };
 
+        // 保存用户输入的内容，因为setInputValue会清空它
+        const messageContent = inputValue;
+        
+        // 立即添加用户消息到界面并清空输入框
         setMessages(prev => [...prev, userMessage]);
         setInputValue('');
         setIsLoading(true);
         setError(null);
 
         try {
-            const response = await callChatAPI(inputValue, chatSession);
+            // 调用API获取回复，SignalR会自动处理Bot回复的添加
+            await callChatAPI(messageContent, chatSession);
             
-            const botMessage: Message = {
-                id: `bot-${Date.now()}`,
-                content: response,
-                isBot: true,
-                timestamp: Date.now(),
-                type: ChatMessageType.Message,
-                authorRole: AuthorRoles.Bot,
-            };
+            // 聊天历史会通过useEffect自动保存，无需手动保存
             
-            setMessages(prev => [...prev, botMessage]);
         } catch (err) {
+            console.error('❌ 发送消息失败:', err);
             setError(err instanceof Error ? err.message : '发送消息失败');
-        } finally {
             setIsLoading(false);
+            
+            // 如果API调用失败，但不是因为SignalR问题，添加一个离线回复
+            if (!err?.toString().includes('SignalR')) {
+                try {
+                    const offlineResponse = await generateSmartResponse(messageContent);
+                    const botMessage: Message = {
+                        id: `bot-offline-${Date.now()}`,
+                        content: offlineResponse,
+                        isBot: true,
+                        timestamp: Date.now(),
+                        type: ChatMessageType.Message,
+                        authorRole: AuthorRoles.Bot,
+                    };
+                    
+                    setMessages(prev => [...prev, botMessage]);
+                    setError(null); // 清除错误，因为我们提供了离线回复
+                } catch (offlineErr) {
+                    console.error('❌ 离线回复也失败了:', offlineErr);
+                }
+            }
         }
     };
 
@@ -631,33 +710,42 @@ const DoctorChatApp: React.FC = () => {
                 accessToken = ''; // None模式下使用空令牌
             }
 
-            // 每次都创建新的会话以确保后端一致性
-            console.log('🔄 创建新的后端会话...');
-            const sessionTitle = session.title.replace(' (API)', ''); // 移除已有的API标记
-            const result: ICreateChatSessionResponse = await chatService.createChatAsync(sessionTitle, accessToken);
-            console.log('📥 后端会话创建成功:', result.chatSession.id);
+            // 使用现有会话或创建新会话（支持多轮对话）
+            let currentSession = session;
             
-            // 更新会话信息
-            const currentSession: IChatSession = {
-                ...result.chatSession,
-                title: sessionTitle + ' (API)' // 标记为已创建到后端
-            };
-            setChatSession(currentSession); // 更新状态
-            
-            // 将新会话添加到SignalR组
-            void addToSignalRGroup(currentSession.id);
-            
-            // 更新本地存储
-            if (doctorInfo) {
-                const storageKey = getStorageKey(doctorInfo.id);
-                const chatData: ChatHistoryData = {
-                    doctorInfo,
-                    messages,
-                    chatSession: currentSession,
-                    timestamp: Date.now(),
+            // 检查会话是否已经在后端创建过
+            if (!session.id || !session.title.includes('(API)')) {
+                console.log('🔄 创建新的后端会话...');
+                const sessionTitle = session.title.replace(' (API)', ''); // 移除已有的API标记
+                const result: ICreateChatSessionResponse = await chatService.createChatAsync(sessionTitle, accessToken);
+                console.log('📥 后端会话创建成功:', result.chatSession.id);
+                
+                // 更新会话信息
+                currentSession = {
+                    ...result.chatSession,
+                    title: sessionTitle + ' (API)' // 标记为已创建到后端
                 };
-                localStorage.setItem(storageKey, JSON.stringify(chatData));
-                console.log('💾 已更新本地存储的会话信息');
+                setChatSession(currentSession); // 更新状态
+                
+                // 将新会话添加到SignalR组
+                await addToSignalRGroup(currentSession.id);
+                
+                // 更新本地存储
+                if (doctorInfo) {
+                    const storageKey = getStorageKey(doctorInfo.id);
+                    const chatData: ChatHistoryData = {
+                        doctorInfo,
+                        messages,
+                        chatSession: currentSession,
+                        timestamp: Date.now(),
+                    };
+                    localStorage.setItem(storageKey, JSON.stringify(chatData));
+                    console.log('💾 已更新本地存储的会话信息');
+                }
+            } else {
+                console.log('✅ 使用现有会话进行多轮对话:', session.id);
+                // 确保现有会话也在SignalR组中
+                await addToSignalRGroup(session.id);
             }
 
             // 构建Ask对象，使用新创建的会话
@@ -731,6 +819,7 @@ const DoctorChatApp: React.FC = () => {
                             const responseVar = variables.find((v: any) => v.key === key);
                             if (responseVar && responseVar.value && typeof responseVar.value === 'string') {
                                 console.log(`✅ 从variables[${key}]中找到回复内容:`, responseVar.value.substring(0, 100) + '...');
+                                // 不直接返回，让SignalR处理消息显示
                                 return responseVar.value;
                             }
                         }
