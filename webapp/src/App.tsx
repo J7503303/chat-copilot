@@ -3,6 +3,7 @@ import { FluentProvider, Subtitle1, makeStyles, shorthands, tokens } from '@flue
 
 import * as React from 'react';
 import { useCallback, useEffect } from 'react';
+import DoctorChatApp from './DoctorChatApp';
 import Chat from './components/chat/Chat';
 import { Loading, Login } from './components/views';
 import { AuthHelper } from './libs/auth/AuthHelper';
@@ -55,6 +56,21 @@ export enum AppState {
     SigningOut,
 }
 
+// 检查是否为医生聊天模式
+const checkDoctorChatMode = () => {
+    const params = new URLSearchParams(window.location.search);
+    const doctorId = params.get('doctor_id') ?? params.get('userId');
+    const isDoctor = params.get('mode') === 'doctor' || !!doctorId;
+    
+    return {
+        isDoctorMode: isDoctor,
+        doctorId: doctorId ?? '',
+        doctorName: params.get('doctor_name') ?? params.get('userName') ?? '',
+        deptName: params.get('dept_name') ?? '',
+        patientName: params.get('patient_name') ?? ''
+    };
+};
+
 const App = () => {
     const classes = useClasses();
     const [appState, setAppState] = React.useState(AppState.ProbeForBackend);
@@ -66,9 +82,36 @@ const App = () => {
     const chat = useChat();
     const file = useFile();
 
+    // 检查医生聊天模式
+    const doctorMode = React.useMemo(() => checkDoctorChatMode(), []);
+
     const handleAppStateChange = useCallback((newState: AppState) => {
         setAppState(newState);
     }, []);
+
+    // 设置用户信息（适用于医生模式）
+    const setupUserInfoForDoctorMode = useCallback(() => {
+        if (isAuthenticated && doctorMode.isDoctorMode) {
+            const account = instance.getActiveAccount();
+            if (account) {
+                dispatch(
+                    setActiveUserInfo({
+                        id: `${account.localAccountId}.${account.tenantId}`,
+                        email: account.username,
+                        username: account.name ?? account.username,
+                    }),
+                );
+                console.log('✅ 医生模式：用户信息设置完成', account.username);
+            }
+        }
+    }, [isAuthenticated, doctorMode.isDoctorMode, instance, dispatch]);
+
+    React.useEffect(() => {
+        // 如果是医生模式，设置用户信息
+        if (doctorMode.isDoctorMode) {
+            setupUserInfoForDoctorMode();
+        }
+    }, [doctorMode.isDoctorMode, setupUserInfoForDoctorMode]);
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -127,26 +170,38 @@ const App = () => {
 
     const theme = features[FeatureKeys.DarkMode].enabled ? semanticKernelDarkTheme : semanticKernelLightTheme;
 
+    // 如果是医生聊天模式，直接渲染医生聊天界面
+    if (doctorMode.isDoctorMode) {
+        return (
+            <FluentProvider className="app-container" theme={theme}>
+                <DoctorChatApp />
+            </FluentProvider>
+        );
+    }
+
+    // 原有的正常聊天模式
     return (
         <FluentProvider className="app-container" theme={theme}>
-            {AuthHelper.isAuthAAD() ? (
-                <>
-                    <UnauthenticatedTemplate>
-                        <div className={classes.container}>
-                            <div className={classes.header} aria-label="Application Header">
-                                <Subtitle1 as="h1">Chat Copilot</Subtitle1>
+            <div className={classes.container}>
+                {AuthHelper.isAuthAAD() ? (
+                    <>
+                        <UnauthenticatedTemplate>
+                            <div className={classes.container}>
+                                <div className={classes.header} aria-label="Application Header">
+                                    <Subtitle1 as="h1">Chat Copilot</Subtitle1>
+                                </div>
+                                {appState === AppState.SigningOut && <Loading text="Signing you out..." />}
+                                {appState !== AppState.SigningOut && <Login />}
                             </div>
-                            {appState === AppState.SigningOut && <Loading text="Signing you out..." />}
-                            {appState !== AppState.SigningOut && <Login />}
-                        </div>
-                    </UnauthenticatedTemplate>
-                    <AuthenticatedTemplate>
-                        <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
-                    </AuthenticatedTemplate>
-                </>
-            ) : (
-                <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
-            )}
+                        </UnauthenticatedTemplate>
+                        <AuthenticatedTemplate>
+                            <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
+                        </AuthenticatedTemplate>
+                    </>
+                ) : (
+                    <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
+                )}
+            </div>
         </FluentProvider>
     );
 };
