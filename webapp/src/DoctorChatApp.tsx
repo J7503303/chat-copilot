@@ -300,10 +300,14 @@ const DoctorChatApp: React.FC = () => {
                 });
 
                 // 监听Bot响应状态更新
-                connection.on('ReceiveBotResponseStatus', (chatId: string, status: string) => {
-                    console.log('📊 收到Bot响应状态:', { chatId, status });
-                    if (status.includes('Generating bot response')) {
-                        setIsLoading(true);
+                connection.on('ReceiveBotResponseStatus', (chatId: string, status: string | null) => {
+                    try {
+                        console.log('📊 收到Bot响应状态:', { chatId, status, statusType: typeof status });
+                        if (status && typeof status === 'string' && status.includes('Generating bot response')) {
+                            setIsLoading(true);
+                        }
+                    } catch (error) {
+                        console.error('❌ ReceiveBotResponseStatus处理错误:', error, { chatId, status, statusType: typeof status });
                     }
                 });
 
@@ -818,17 +822,19 @@ const DoctorChatApp: React.FC = () => {
                         for (const key of contentKeys) {
                             const responseVar = variables.find((v: any) => v.key === key);
                             if (responseVar && responseVar.value && typeof responseVar.value === 'string') {
-                                console.log(`✅ 从variables[${key}]中找到回复内容:`, responseVar.value.substring(0, 100) + '...');
+                                const content = responseVar.value as string;
+                                console.log(`✅ 从variables[${key}]中找到回复内容:`, content.substring(0, 100) + '...');
                                 // 不直接返回，让SignalR处理消息显示
-                                return responseVar.value;
+                                return content;
                             }
                         }
                         
                         // 如果没有找到特定的key，尝试获取第一个有内容的变量
                         const firstVar = variables.find((v: any) => v.value && typeof v.value === 'string' && v.value.length > 10);
                         if (firstVar) {
-                            console.log('✅ 使用第一个有效变量作为回复:', firstVar.key, firstVar.value.substring(0, 100) + '...');
-                            return firstVar.value;
+                            const content = firstVar.value as string;
+                            console.log('✅ 使用第一个有效变量作为回复:', firstVar.key, content.substring(0, 100) + '...');
+                            return content;
                         }
                     }
                     
@@ -841,8 +847,9 @@ const DoctorChatApp: React.FC = () => {
             
             // 兼容前端期望的格式 {message: {content: string}}
             if (apiResult && apiResult.message && apiResult.message.content) {
-                console.log('✅ 成功获取API回复(旧格式):', apiResult.message.content.substring(0, 100) + '...');
-                return apiResult.message.content;
+                const content = apiResult.message.content as string;
+                console.log('✅ 成功获取API回复(旧格式):', content.substring(0, 100) + '...');
+                return content;
             }
             
             console.warn('⚠️ API响应格式不正确:', apiResult);
