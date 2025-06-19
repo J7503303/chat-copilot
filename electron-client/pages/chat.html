@@ -174,8 +174,8 @@
   </div>
 
   <!-- webapp iframe -->
-  <iframe id="webappFrame" class="webapp-container" src="http://localhost:8440" style="display: none;"
-    onload="handleIframeLoad()" onerror="handleIframeError()">
+  <iframe id="webappFrame" class="webapp-container" src="" style="display: none;" onload="handleIframeLoad()"
+    onerror="handleIframeError()">
   </iframe>
 
   <script>
@@ -251,7 +251,7 @@
 
         // 重新加载iframe
         const iframe = document.getElementById('webappFrame');
-        iframe.src = 'http://localhost:8440?retry=' + retryCount + '&t=' + Date.now();
+        iframe.src = buildWebappUrl() + '&retry=' + retryCount + '&t=' + Date.now();
         updateRetryCount();
       } else {
         showStatus('重试次数已达上限', 'error');
@@ -306,6 +306,9 @@
       }
     }
 
+    // 存储当前的导航参数
+    let currentNavigationParams = null;
+
     // 获取上下文信息
     function getContextInfo() {
       try {
@@ -314,11 +317,30 @@
           return window.parent.getContextInfo();
         }
 
+        // 使用导航参数构建上下文信息
+        if (currentNavigationParams && currentNavigationParams.params) {
+          const { doctor, department, patient } = currentNavigationParams.params;
+          return {
+            doctorId: doctor?.id || doctor?.code || '',
+            doctorName: doctor?.name || '医生',
+            deptId: department?.id || department?.code || '',
+            deptName: department?.name || '',
+            patientId: patient?.id || '',
+            patientName: patient?.name || '未知患者',
+            patientBed: patient?.bed || '',
+            patientSex: patient?.sex || '',
+            patientAge: patient?.age || '',
+            source: 'electron-app',
+            timestamp: new Date().toISOString()
+          };
+        }
+
         // 如果无法获取，返回默认信息
         return {
-          patientId: '',
-          patientName: '未知患者',
+          doctorId: '',
           doctorName: '医生',
+          deptName: '',
+          patientName: '未知患者',
           source: 'electron-app',
           timestamp: new Date().toISOString()
         };
@@ -386,6 +408,45 @@
       }
     });
 
+    // 构建webapp URL
+    function buildWebappUrl() {
+      const baseUrl = 'http://localhost:8440/doctor-chat.html';
+      const params = new URLSearchParams();
+
+      if (currentNavigationParams && currentNavigationParams.params) {
+        const { doctor, department, patient } = currentNavigationParams.params;
+        console.log('Building URL with params:', { doctor: doctor?.name, department: department?.name, patient: patient?.name });
+
+        // 添加医生信息
+        if (doctor?.id) params.append('doctor_id', doctor.id);
+        if (doctor?.code) params.append('doctor_code', doctor.code);
+        if (doctor?.name) params.append('doctor_name', doctor.name);
+
+        // 添加科室信息
+        if (department?.id) params.append('dept_id', department.id);
+        if (department?.code) params.append('dept_code', department.code);
+        if (department?.name) params.append('dept_name', department.name);
+
+        // 添加患者信息
+        if (patient?.id) params.append('patient_id', patient.id);
+        if (patient?.name) params.append('patient_name', patient.name);
+        if (patient?.bed) params.append('patient_bed', patient.bed);
+        if (patient?.sex) params.append('patient_sex', patient.sex);
+        if (patient?.age) params.append('patient_age', patient.age);
+      } else {
+        console.warn('No navigation params, using defaults');
+        // 如果没有参数，添加默认值
+        params.append('doctor_id', 'doctor_001');
+        params.append('doctor_name', '张医生');
+        params.append('dept_name', '心内科');
+      }
+
+      const queryString = params.toString();
+      const finalUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+      console.log('Built webapp URL:', finalUrl);
+      return finalUrl;
+    }
+
     // 检查webapp服务可用性
     function checkWebappService() {
       return fetch('http://localhost:8440', {
@@ -417,8 +478,13 @@
 
     // 初始化
     async function initialize() {
-      console.log('Chat页面正在初始化...');
+      console.log('Chat page initializing...');
       showStatus('正在连接聊天服务...', 'warning', 0);
+
+      // 设置iframe的初始URL
+      const iframe = document.getElementById('webappFrame');
+      const initialUrl = buildWebappUrl();
+      iframe.src = initialUrl;
 
       // 初始检查webapp服务
       setTimeout(async () => {
@@ -432,6 +498,22 @@
           startWebappHealthCheck();
         }
       }, 1000);
+    }
+
+    // 监听来自主进程的导航参数
+    if (window.electronAPI && window.electronAPI.onNavigationParams) {
+      console.log('Navigation params listener registered');
+      window.electronAPI.onNavigationParams((params) => {
+        console.log('Received navigation params:', params.page);
+        currentNavigationParams = params;
+
+        // 重新加载iframe以应用新参数
+        const iframe = document.getElementById('webappFrame');
+        const newUrl = buildWebappUrl();
+        iframe.src = newUrl;
+      });
+    } else {
+      console.warn('electronAPI or onNavigationParams unavailable');
     }
 
     // 页面加载完成后初始化
@@ -475,7 +557,46 @@
       }
     };
 
-    console.log('Chat页面已加载，集成接口已就绪');
+    console.log('Chat page loaded, integration interface ready');
+
+    // 实现setContextInfo函数，供main-layout.html调用
+    window.setContextInfo = function (contextInfo) {
+      console.log('Chat page received context info');
+
+      if (contextInfo) {
+        // 将上下文信息转换为导航参数格式
+        const navigationParams = {
+          page: 'chat',
+          params: {
+            doctor: {
+              id: contextInfo.doctorId,
+              code: contextInfo.doctorCode,
+              name: contextInfo.doctorName
+            },
+            department: {
+              id: contextInfo.deptId,
+              code: contextInfo.deptCode,
+              name: contextInfo.deptName
+            },
+            patient: {
+              id: contextInfo.patientId,
+              name: contextInfo.patientName,
+              bed: contextInfo.patientBed,
+              sex: contextInfo.patientSex,
+              age: contextInfo.patientAge
+            }
+          },
+          timestamp: new Date().toISOString()
+        };
+
+        // 更新currentNavigationParams并重新加载iframe
+        currentNavigationParams = navigationParams;
+        const iframe = document.getElementById('webappFrame');
+        if (iframe) {
+          iframe.src = buildWebappUrl();
+        }
+      }
+    };
   </script>
 </body>
 

@@ -521,10 +521,26 @@ function createHttpServer() {
                 }
             };
 
-            // 过滤掉空值
-            const cleanParams = JSON.parse(JSON.stringify(params, (key, value) => {
-                return value === undefined || value === '' ? undefined : value;
-            }));
+            // 更宽松的参数过滤 - 只移除undefined，保留空字符串
+            const cleanParams = {};
+            Object.keys(params).forEach(key => {
+                if (params[key] && typeof params[key] === 'object') {
+                    cleanParams[key] = {};
+                    Object.keys(params[key]).forEach(subKey => {
+                        if (params[key][subKey] !== undefined) {
+                            cleanParams[key][subKey] = params[key][subKey];
+                        }
+                    });
+                    // 如果对象为空，删除它
+                    if (Object.keys(cleanParams[key]).length === 0) {
+                        delete cleanParams[key];
+                    }
+                } else if (params[key] !== undefined) {
+                    cleanParams[key] = params[key];
+                }
+            });
+
+            console.log('参数处理:', { original: params, cleaned: cleanParams });
 
             // 显示主窗口并确保置顶
             showWindow();
@@ -550,15 +566,18 @@ function createHttpServer() {
                 toggleCompactMode();
             }
 
-            // 向页面发送参数
-            if (mainWindow && Object.keys(cleanParams).some(key =>
-                Object.keys(cleanParams[key]).some(subKey => cleanParams[key][subKey] !== undefined)
-            )) {
-                mainWindow.webContents.send('navigation-params', {
-                    page: page || currentTab,
-                    params: cleanParams,
-                    timestamp: new Date().toISOString()
-                });
+            // 向页面发送参数 - 总是发送消息，即使参数为空
+            const messageData = {
+                page: page || currentTab,
+                params: cleanParams,
+                timestamp: new Date().toISOString()
+            };
+
+            if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('navigation-params', messageData);
+                console.log('Navigation params sent:', messageData.page);
+            } else {
+                console.log('Warning: mainWindow or webContents unavailable');
             }
 
             // 返回简化的成功响应

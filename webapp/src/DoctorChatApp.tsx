@@ -187,12 +187,11 @@ const DoctorChatApp: React.FC = () => {
                         nextRetryDelayInMilliseconds: retryContext => {
                             // 更严格的重连控制
                             if (retryContext.previousRetryCount >= 3) {
-                                console.log('🛑 SignalR达到最大重连次数，停止重连');
-                                return null; // 停止重连
-                            }
-                            const delay = Math.min(2000 * Math.pow(2, retryContext.previousRetryCount), 10000);
-                            console.log(`⏱️ SignalR将在${delay}ms后重连 (第${retryContext.previousRetryCount + 1}次)`);
-                            return delay;
+                                                            console.log('SignalR max retries reached, stopping reconnection');
+                            return null; // 停止重连
+                        }
+                        const delay = Math.min(2000 * Math.pow(2, retryContext.previousRetryCount), 10000);
+                        return delay;
                         }
                     })
                     .configureLogging(signalR.LogLevel.Error) // 只显示错误日志
@@ -200,17 +199,17 @@ const DoctorChatApp: React.FC = () => {
 
                 // 设置连接事件处理
                 connection.onclose((error) => {
-                    console.log('📡 SignalR连接已关闭', error?.message || '正常关闭');
+                    console.log('SignalR connection closed:', error?.message || 'Normal closure');
                     setHubConnection(null);
                     isConnecting = false;
                 });
 
-                connection.onreconnecting((error) => {
-                    console.log('🔄 SignalR正在重连...', error?.message || '');
+                connection.onreconnecting((_error) => {
+                    console.log('SignalR reconnecting...');
                 });
 
-                connection.onreconnected((connectionId) => {
-                    console.log('✅ SignalR重连成功', connectionId);
+                connection.onreconnected((_connectionId) => {
+                    console.log('SignalR reconnected');
                     // 重连后重新加入聊天组
                     if (chatSession) {
                         void addToSignalRGroup(chatSession.id);
@@ -218,13 +217,13 @@ const DoctorChatApp: React.FC = () => {
                 });
 
                 await connection.start();
-                console.log('✅ SignalR连接已建立，状态:', connection.state);
+                console.log('SignalR connection established');
                 setHubConnection(connection);
                 isConnecting = false;
 
                 // 监听消息接收 - 完整的新消息
-                connection.on('ReceiveMessage', (chatId: string, senderId: string, message: SignalRMessage) => {
-                    console.log('📥 SignalR收到完整消息:', { chatId, senderId, message });
+                connection.on('ReceiveMessage', (_chatId: string, _senderId: string, message: SignalRMessage) => {
+                    console.log('SignalR message received');
                     
                     if (message.authorRole === AuthorRoles.Bot) {
                         const newMessage: Message = {
@@ -253,7 +252,7 @@ const DoctorChatApp: React.FC = () => {
 
                 // 监听消息更新 - 流式输出的增量更新
                 connection.on('ReceiveMessageUpdate', (message: SignalRMessage) => {
-                    console.log('📥 SignalR消息更新:', message);
+                    console.log('SignalR message updated');
                     
                     if (message.authorRole === AuthorRoles.Bot) {
                         setMessages(prev => {
@@ -300,14 +299,14 @@ const DoctorChatApp: React.FC = () => {
                 });
 
                 // 监听Bot响应状态更新
-                connection.on('ReceiveBotResponseStatus', (chatId: string, status: string | null) => {
+                connection.on('ReceiveBotResponseStatus', (_chatId: string, status: string | null) => {
                     try {
-                        console.log('📊 收到Bot响应状态:', { chatId, status, statusType: typeof status });
+                        console.log('Bot response status received');
                         if (status && typeof status === 'string' && status.includes('Generating bot response')) {
                             setIsLoading(true);
                         }
                     } catch (error) {
-                        console.error('❌ ReceiveBotResponseStatus处理错误:', error, { chatId, status, statusType: typeof status });
+                        console.error('ReceiveBotResponseStatus处理错误:', error, { status, statusType: typeof status });
                     }
                 });
 
@@ -328,7 +327,7 @@ const DoctorChatApp: React.FC = () => {
 
         return () => {
             if (connection && connection.state === signalR.HubConnectionState.Connected) {
-                console.log('🔌 清理SignalR连接');
+                console.log('Cleaning up SignalR connection');
                 void connection.stop();
             }
             isConnecting = false;
@@ -339,14 +338,14 @@ const DoctorChatApp: React.FC = () => {
     const addToSignalRGroup = useCallback(async (chatId: string) => {
         if (hubConnection && hubConnection.state === signalR.HubConnectionState.Connected && chatId) {
             try {
-                console.log('🔗 将聊天添加到SignalR组:', chatId);
+                console.log('Adding chat to SignalR group');
                 await hubConnection.invoke('AddClientToGroupAsync', chatId);
-                console.log('✅ 成功加入SignalR组:', chatId);
+                console.log('Successfully joined SignalR group');
             } catch (err) {
                 console.warn('❌ 添加到SignalR组失败:', err);
             }
         } else {
-            console.log('⚠️ 跳过SignalR组加入，连接状态:', hubConnection?.state || 'null');
+            console.log('Skipping SignalR group join, connection unavailable');
         }
     }, [hubConnection]);
 
@@ -361,7 +360,7 @@ const DoctorChatApp: React.FC = () => {
                 timestamp: Date.now(),
             };
             localStorage.setItem(storageKey, JSON.stringify(chatData));
-            console.log('💾 自动保存聊天历史，消息数量:', messages.length);
+            console.log('Auto-saving chat history');
         }
     }, [messages, doctorInfo, chatSession]); // 当消息、医生信息或会话变化时自动保存
 
@@ -371,16 +370,16 @@ const DoctorChatApp: React.FC = () => {
             try {
                 // 首先确保authConfig已加载
                 const authConfig = AuthHelper.getAuthConfig();
-                console.log('🔍 当前authConfig状态:', authConfig);
+                
                 
                 if (!authConfig) {
-                    console.log('⚠️ authConfig未加载，尝试重新获取...');
+                    console.log('AuthConfig not loaded, retrying...');
                     // 如果authConfig未加载，尝试从后端获取
                     try {
                         const response = await fetch(new URL('authConfig', BackendServiceUrl));
                         if (response.ok) {
                             const config = await response.json();
-                            console.log('✅ 成功获取authConfig:', config);
+                            console.log('AuthConfig loaded successfully');
                             dispatch(setAuthConfig(config));
                         } else {
                             console.warn('⚠️ 无法获取authConfig，使用None模式');
@@ -406,7 +405,7 @@ const DoctorChatApp: React.FC = () => {
                 if (AuthHelper.isAuthAAD()) {
                     const account = instance.getActiveAccount();
                     if (account) {
-                        console.log('🔄 设置活跃用户信息 (AAD模式)...', account);
+                        console.log('Setting active user info (AAD mode)');
                         dispatch(setActiveUserInfo({
                             id: `${account.localAccountId}.${account.tenantId}`,
                             email: account.username,
@@ -418,13 +417,37 @@ const DoctorChatApp: React.FC = () => {
                         return;
                     }
                 } else {
-                    // None模式，使用默认用户信息
-                    console.log('🔄 使用默认用户信息 (None模式)...');
+                    // None模式，使用医生ID作为用户信息
+                    console.log('Using doctor ID as user info (None mode)');
+                    
+                    // 获取医生参数
+                    const getDoctorParams = () => {
+                        if ((window as any).DOCTOR_PARAMS) {
+                            const params = (window as any).DOCTOR_PARAMS;
+                            return {
+                                doctorId: params.doctor_id || params.userId || '',
+                                doctorName: params.doctor_name || params.userName || '',
+                            };
+                        }
+                        
+                        const params = new URLSearchParams(window.location.search);
+                        return {
+                            doctorId: params.get('doctor_id') ?? params.get('userId') ?? '',
+                            doctorName: params.get('doctor_name') ?? params.get('userName') ?? '',
+                        };
+                    };
+
+                    const { doctorId, doctorName } = getDoctorParams();
+                    const userId = doctorId || 'c05c61eb-65e4-4223-915a-fe72b0c9ece1';
+                    const userName = doctorName || 'Default User';
+                    
                     dispatch(setActiveUserInfo({
-                        id: 'c05c61eb-65e4-4223-915a-fe72b0c9ece1',
-                        email: 'user@contoso.com',
-                        username: 'Default User',
+                        id: userId,
+                        email: `${userId}@medical.local`,
+                        username: userName,
                     }));
+                    
+                    console.log('Doctor user info set');
                 }
                 
                 setIsAuthReady(true);
@@ -441,12 +464,30 @@ const DoctorChatApp: React.FC = () => {
         // 只有在身份验证准备就绪后才初始化医生信息和聊天会话
         if (!isAuthReady) return;
 
-        // 从URL参数获取医生信息
-        const params = new URLSearchParams(window.location.search);
-        const doctorId = params.get('doctor_id') ?? params.get('userId');
-        const doctorName = params.get('doctor_name') ?? params.get('userName');
-        const deptName = params.get('dept_name');
-        const patientName = params.get('patient_name');
+        // 优先从window.DOCTOR_PARAMS获取参数（用于electron集成），然后从URL参数获取
+        const getDoctorParams = () => {
+            // 检查是否有全局参数（electron模式）
+            if ((window as any).DOCTOR_PARAMS) {
+                const params = (window as any).DOCTOR_PARAMS;
+                return {
+                    doctorId: params.doctor_id || params.userId || '',
+                    doctorName: params.doctor_name || params.userName || '',
+                    deptName: params.dept_name || '',
+                    patientName: params.patient_name || ''
+                };
+            }
+            
+            // 从URL参数获取医生信息
+            const params = new URLSearchParams(window.location.search);
+            return {
+                doctorId: params.get('doctor_id') ?? params.get('userId'),
+                doctorName: params.get('doctor_name') ?? params.get('userName'),
+                deptName: params.get('dept_name'),
+                patientName: params.get('patient_name')
+            };
+        };
+
+        const { doctorId, doctorName, deptName, patientName } = getDoctorParams();
 
         if (!doctorId) {
             setError('缺少必需的医生ID参数 (doctor_id)');
@@ -463,6 +504,67 @@ const DoctorChatApp: React.FC = () => {
         setDoctorInfo(info);
         void initializeChatSession(info);
     }, [isAuthReady]);
+
+    // 监听来自父窗口的参数更新（用于electron集成）
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data && event.data.type === 'CONTEXT_UPDATE') {
+                console.log('Context update received, reinitializing doctor info');
+                
+                // 更新全局参数
+                if (event.data.data && (window as any).DOCTOR_PARAMS) {
+                    Object.assign((window as any).DOCTOR_PARAMS, event.data.data);
+                }
+                
+                // 重新获取医生信息并初始化
+                const getDoctorParams = () => {
+                    if ((window as any).DOCTOR_PARAMS) {
+                        const params = (window as any).DOCTOR_PARAMS;
+                        return {
+                            doctorId: params.doctor_id || params.userId || '',
+                            doctorName: params.doctor_name || params.userName || '',
+                            deptName: params.dept_name || '',
+                            patientName: params.patient_name || ''
+                        };
+                    }
+                    return null;
+                };
+
+                const params = getDoctorParams();
+                if (params && params.doctorId) {
+                    // 检查医生ID是否改变
+                    const currentDoctorId = doctorInfo?.id;
+                    const newDoctorId = params.doctorId;
+                    
+                    if (currentDoctorId !== newDoctorId) {
+                        console.log('🔄 医生ID已改变，从', currentDoctorId, '到', newDoctorId);
+                        
+                        // 更新用户信息
+                        dispatch(setActiveUserInfo({
+                            id: newDoctorId,
+                            email: `${newDoctorId}@medical.local`,
+                            username: params.doctorName ?? `医生${newDoctorId}`,
+                        }));
+                        console.log('Updated user info for new doctor ID');
+                    }
+                    
+                    const info: DoctorInfo = {
+                        id: params.doctorId,
+                        name: params.doctorName ?? `医生${params.doctorId}`,
+                        dept: params.deptName ?? undefined,
+                        patient: params.patientName ?? undefined,
+                    };
+                    
+                    console.log('Updating doctor info');
+                    setDoctorInfo(info);
+                    void initializeChatSession(info);
+                }
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [isAuthReady, doctorInfo, dispatch]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -484,12 +586,26 @@ const DoctorChatApp: React.FC = () => {
 
     const loadChatHistory = (doctorId: string) => {
         try {
+            console.log('Loading chat history');
             const storageKey = getStorageKey(doctorId);
             const savedData = localStorage.getItem(storageKey);
             if (savedData) {
                 const chatData = JSON.parse(savedData) as ChatHistoryData;
+                console.log('📂 找到聊天历史数据:', {
+                    doctorId: chatData.doctorInfo?.id,
+                    messageCount: chatData.messages?.length,
+                    timestamp: new Date(chatData.timestamp).toLocaleString()
+                });
+                
                 // 如果历史记录不超过24小时，则恢复
                 if (Date.now() - chatData.timestamp < 24 * 60 * 60 * 1000) {
+                    // 验证医生ID是否匹配
+                    if (chatData.doctorInfo?.id !== doctorId) {
+                        console.warn('⚠️ 聊天历史中的医生ID不匹配，删除历史记录');
+                        localStorage.removeItem(storageKey);
+                        return false;
+                    }
+                    
                     // 检查会话ID是否为GUID格式
                     const isGUID = (id: string) => {
                         const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -498,7 +614,7 @@ const DoctorChatApp: React.FC = () => {
                     
                     // 如果会话ID不是GUID格式，生成新的GUID格式ID
                     if (chatData.chatSession && !isGUID(chatData.chatSession.id)) {
-                        console.log('🔄 检测到旧格式的会话ID，转换为GUID格式');
+                        console.log('Converting old session ID to GUID format');
                         const generateGUID = () => {
                             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                                 const r = Math.random() * 16 | 0;
@@ -508,7 +624,7 @@ const DoctorChatApp: React.FC = () => {
                         };
                         
                         const newGUID = generateGUID();
-                        console.log(`🆔 旧ID: ${chatData.chatSession.id} -> 新ID: ${newGUID}`);
+                        console.log('Session ID converted');
                         chatData.chatSession.id = newGUID;
                         
                         // 更新本地存储
@@ -518,46 +634,65 @@ const DoctorChatApp: React.FC = () => {
                     
                     setMessages(chatData.messages || []);
                     setChatSession(chatData.chatSession);
+                    console.log('Chat history restored');
                     return true;
+                } else {
+                    // 历史记录过期，删除
+                    localStorage.removeItem(storageKey);
+                    console.log('Expired chat history deleted');
                 }
+            } else {
+                console.log('No chat history found');
             }
         } catch (err) {
-            console.warn('加载聊天历史失败:', err);
+            console.warn('加载聊天历史失败，医生ID:', doctorId, '错误:', err);
         }
         return false;
     };
 
     const initializeChatSession = async (doctor: DoctorInfo) => {
         try {
-            // 如果已经从本地存储加载了历史记录，就不需要重新初始化
+            console.log('Initializing chat session');
+            
+            // 检查是否是新的医生ID，如果是则清除当前状态
+            const currentDoctorId = doctorInfo?.id;
+            if (currentDoctorId && currentDoctorId !== doctor.id) {
+                console.log('Doctor ID changed, clearing current state');
+                setMessages([]);
+                setChatSession(null);
+            }
+            
+            // 尝试从本地存储加载历史记录
             if (loadChatHistory(doctor.id)) {
-                console.log('📂 从本地存储恢复聊天历史');
+                console.log('Restoring chat history from local storage');
                 return;
             }
+            
+            console.log('No chat history found, creating new session');
 
             // 创建新的聊天会话 - 使用真实的API
             const chatTitle = `${doctor.name} - 医生聊天 @ ${new Date().toLocaleString()}`;
             
-            console.log('🔄 开始创建聊天会话...', { chatTitle, doctorId: doctor.id });
+            console.log('Creating chat session...');
             
             try {
                 // 根据认证类型获取访问令牌
                 let accessToken = '';
                 if (AuthHelper.isAuthAAD()) {
-                    console.log('🔑 AAD模式，获取访问令牌...');
+                    console.log('AAD mode, getting access token...');
                     accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
                 if (!accessToken) {
                     throw new Error('无法获取访问令牌');
                     }
-                    console.log('✅ 获取访问令牌成功');
+                    console.log('Access token obtained');
                 } else {
-                    console.log('🔓 None模式，跳过令牌获取');
+                    console.log('None mode, skipping token');
                     accessToken = ''; // None模式下使用空令牌
                 }
                 
-                console.log('📤 发送创建会话请求...');
+                console.log('Sending create session request...');
                 const result: ICreateChatSessionResponse = await chatService.createChatAsync(chatTitle, accessToken);
-                console.log('📥 创建会话响应:', result);
+                console.log('Create session response received');
                 
                 // 标记会话为已在后端创建
                 const apiSession = {
@@ -565,7 +700,7 @@ const DoctorChatApp: React.FC = () => {
                     title: chatTitle + ' (API)'
                 };
                 setChatSession(apiSession);
-                console.log('✅ 聊天会话创建成功:', apiSession.id);
+                console.log('Chat session created successfully');
                 
                 // 将聊天会话添加到SignalR组
                 void addToSignalRGroup(apiSession.id);
@@ -593,7 +728,7 @@ const DoctorChatApp: React.FC = () => {
                 };
                 
                 setMessages([initialMessage, welcomeMessage]);
-                console.log('✅ 初始化消息设置完成');
+                console.log('Initial message setup completed');
                 
             } catch (apiError) {
                 console.warn('❌ API创建聊天会话失败，使用本地会话:', apiError);
@@ -617,7 +752,7 @@ const DoctorChatApp: React.FC = () => {
                 };
                 
                 setChatSession(localSession);
-                console.log('⚠️ 使用本地会话 (GUID格式):', localSession.id);
+                console.log('Using local session (GUID format)');
                 
                 const welcomeMessage: Message = {
                     id: 'welcome-local',
@@ -703,14 +838,14 @@ const DoctorChatApp: React.FC = () => {
             // 获取访问令牌
             let accessToken = '';
             if (AuthHelper.isAuthAAD()) {
-                console.log('🔑 AAD模式，获取访问令牌...');
+                console.log('AAD mode, getting access token...');
                 accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
                 if (!accessToken) {
                     throw new Error('无法获取访问令牌');
                 }
-                console.log('✅ 获取访问令牌成功');
+                console.log('Access token obtained');
             } else {
-                console.log('🔓 None模式，跳过令牌获取');
+                console.log('None mode, skipping token');
                 accessToken = ''; // None模式下使用空令牌
             }
 
@@ -719,10 +854,10 @@ const DoctorChatApp: React.FC = () => {
             
             // 检查会话是否已经在后端创建过
             if (!session.id || !session.title.includes('(API)')) {
-                console.log('🔄 创建新的后端会话...');
+                console.log('Creating new backend session...');
                 const sessionTitle = session.title.replace(' (API)', ''); // 移除已有的API标记
                 const result: ICreateChatSessionResponse = await chatService.createChatAsync(sessionTitle, accessToken);
-                console.log('📥 后端会话创建成功:', result.chatSession.id);
+                console.log('Backend session created successfully');
                 
                 // 更新会话信息
                 currentSession = {
@@ -744,10 +879,10 @@ const DoctorChatApp: React.FC = () => {
                         timestamp: Date.now(),
                     };
                     localStorage.setItem(storageKey, JSON.stringify(chatData));
-                    console.log('💾 已更新本地存储的会话信息');
+                    console.log('Local session info updated');
                 }
             } else {
-                console.log('✅ 使用现有会话进行多轮对话:', session.id);
+                console.log('Using existing session for multi-turn conversation');
                 // 确保现有会话也在SignalR组中
                 await addToSignalRGroup(session.id);
             }
@@ -800,22 +935,22 @@ const DoctorChatApp: React.FC = () => {
                 authType: AuthHelper.getAuthConfig()?.authType
             });
             
-            console.log('📤 发送API请求到:', `chats/${currentSession.id}/messages`);
+            console.log('Sending API request');
             const apiResult = await chatService.getBotResponseAsync(ask, accessToken);
-            console.log('📥 API响应成功:', apiResult);
-            console.log('🔍 API响应详细结构:', JSON.stringify(apiResult, null, 2));
+            
+            
             
             // 处理后端实际返回的格式 {Value: string, Variables: Array}
             if (apiResult && (apiResult as any).value) {
                 const content = (apiResult as any).value as string;
-                console.log('✅ 成功获取API回复:', content.substring(0, 100) + '...');
+                console.log('API reply received');
                 
                 // 检查content是否是KernelArguments类型，如果是则需要特殊处理
                 if (content === 'Microsoft.SemanticKernel.KernelArguments') {
-                    console.log('⚠️ 检测到KernelArguments响应，检查variables字段...');
+                    console.log('KernelArguments response detected');
                     const variables = (apiResult as any).variables;
                     if (variables && Array.isArray(variables)) {
-                        console.log('📋 Variables内容:', variables);
+                        
                         
                         // 查找关键的回复内容变量，按优先级顺序
                         const contentKeys = ['input', 'response', 'content', 'message', 'answer', 'output'];
@@ -823,7 +958,7 @@ const DoctorChatApp: React.FC = () => {
                             const responseVar = variables.find((v: any) => v.key === key);
                             if (responseVar && responseVar.value && typeof responseVar.value === 'string') {
                                 const content = responseVar.value as string;
-                                console.log(`✅ 从variables[${key}]中找到回复内容:`, content.substring(0, 100) + '...');
+                                console.log('Reply content found in variables');
                                 // 不直接返回，让SignalR处理消息显示
                                 return content;
                             }
@@ -833,7 +968,7 @@ const DoctorChatApp: React.FC = () => {
                         const firstVar = variables.find((v: any) => v.value && typeof v.value === 'string' && v.value.length > 10);
                         if (firstVar) {
                             const content = firstVar.value as string;
-                            console.log('✅ 使用第一个有效变量作为回复:', firstVar.key, content.substring(0, 100) + '...');
+                            console.log('Using first valid variable as reply');
                             return content;
                         }
                     }
@@ -847,8 +982,8 @@ const DoctorChatApp: React.FC = () => {
             
             // 兼容前端期望的格式 {message: {content: string}}
             if (apiResult && apiResult.message && apiResult.message.content) {
-                const content = apiResult.message.content as string;
-                console.log('✅ 成功获取API回复(旧格式):', content.substring(0, 100) + '...');
+                const content = apiResult.message.content;
+                console.log('API reply received (legacy format)');
                 return content;
             }
             
@@ -860,18 +995,18 @@ const DoctorChatApp: React.FC = () => {
             
             // 检查是否是身份验证错误
             if (err instanceof Error && (err.message.includes('401') || err.message.includes('访问令牌'))) {
-                console.log('🔄 身份验证失败，切换到离线模式...');
+                console.log('Authentication failed, switching to offline mode');
                 return await generateSmartResponse(message);
             }
             
             // 检查是否是网络错误
             if (err instanceof Error && (err.message.includes('NetworkError') || err.message.includes('fetch'))) {
-                console.log('🔄 网络连接失败，切换到离线模式...');
+                console.log('Network failed, switching to offline mode');
                 return await generateSmartResponse(message);
             }
             
             // 对于其他错误，也使用智能模拟回复
-            console.log('🔄 API不可用，切换到离线模式...');
+            console.log('API unavailable, switching to offline mode');
             return await generateSmartResponse(message);
         }
     };
@@ -933,7 +1068,7 @@ const DoctorChatApp: React.FC = () => {
             localStorage.removeItem(storageKey);
             setMessages([]);
             setChatSession(null);
-            console.log('🧹 已清理聊天历史，重新初始化会话...');
+            console.log('Chat history cleared, reinitializing session');
             void initializeChatSession(doctorInfo);
         }
     };

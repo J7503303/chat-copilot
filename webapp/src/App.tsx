@@ -62,6 +62,8 @@ const checkDoctorChatMode = () => {
     const doctorId = params.get('doctor_id') ?? params.get('userId');
     const isDoctor = params.get('mode') === 'doctor' || !!doctorId;
     
+    console.log('Doctor mode detection:', { isDoctor, doctorId });
+    
     return {
         isDoctorMode: isDoctor,
         doctorId: doctorId ?? '',
@@ -101,7 +103,7 @@ const App = () => {
                         username: account.name ?? account.username,
                     }),
                 );
-                console.log('✅ 医生模式：用户信息设置完成', account.username);
+                console.log('Doctor mode: User info set for', account.username);
             }
         }
     }, [isAuthenticated, doctorMode.isDoctorMode, instance, dispatch]);

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>医生聊天助手</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #root {
+      width: 100%;
+      height: 100vh;
+    }
+
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: 'Microsoft YaHei', sans-serif;
+      color: #666;
+      background: #f5f5f5;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #0078d4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 16px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <div>正在加载医生聊天界面...</div>
+  </div>
+  <div id="root"></div>
+
+  <!-- 加载React应用的脚本 -->
+  <script>
+    // 隐藏加载界面，显示React应用
+    function hideLoading() {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.style.display = 'none';
+      }
+    }
+
+    // 动态加载React应用的资源
+    function loadReactApp() {
+      console.log('Loading doctor chat React app...');
+
+      // 检查是否有有效的医生信息
+      if (!window.DOCTOR_PARAMS.doctor_id || window.DOCTOR_PARAMS.doctor_id === '') {
+        // 如果没有doctor_id，但有doctor_name，使用doctor_name作为ID
+        if (window.DOCTOR_PARAMS.doctor_name && window.DOCTOR_PARAMS.doctor_name !== '') {
+          window.DOCTOR_PARAMS.doctor_id = window.DOCTOR_PARAMS.doctor_name;
+          console.log('Using doctor name as ID:', window.DOCTOR_PARAMS.doctor_id);
+        } else {
+          console.warn('No valid doctor info found, using defaults');
+          window.DOCTOR_PARAMS.doctor_id = 'default_doctor';
+          window.DOCTOR_PARAMS.doctor_name = '默认医生';
+        }
+      }
+
+      // 加载React应用的JS和CSS文件
+      loadReactAssets();
+    }
+
+    // 加载React应用的资源文件
+    function loadReactAssets() {
+      // 在开发模式下，直接重定向到主应用
+      // 因为开发模式下没有打包的静态文件
+      loadDevelopmentMode();
+    }
+
+    // 开发模式加载
+    function loadDevelopmentMode() {
+      // 在开发模式下，直接重定向到主应用
+      redirectToMainApp();
+    }
+
+    // 重定向到主应用
+    function redirectToMainApp() {
+      hideLoading();
+
+      const params = new URLSearchParams();
+
+      // 确保必要的参数都存在 - 优先使用传入的参数
+      if (!window.DOCTOR_PARAMS.doctor_id || window.DOCTOR_PARAMS.doctor_id === '') {
+        // 如果没有doctor_id，但有doctor_name，使用doctor_name作为ID
+        if (window.DOCTOR_PARAMS.doctor_name && window.DOCTOR_PARAMS.doctor_name !== '') {
+          window.DOCTOR_PARAMS.doctor_id = window.DOCTOR_PARAMS.doctor_name;
+        } else {
+          console.warn('No doctor info, setting defaults');
+          window.DOCTOR_PARAMS.doctor_id = 'doctor_001';
+          window.DOCTOR_PARAMS.doctor_name = '张医生';
+        }
+      }
+
+      // 添加所有非空参数
+      Object.entries(window.DOCTOR_PARAMS).forEach(([key, value]) => {
+        if (value && value.toString().trim() !== '') {
+          params.set(key, value.toString());
+        }
+      });
+
+      // 确保有mode参数
+      params.set('mode', 'doctor');
+
+      const newUrl = `${window.location.origin}/?${params.toString()}`;
+      console.log('Redirecting to main app:', newUrl);
+
+      // 立即重定向
+      window.location.href = newUrl;
+    }
+
+    // 页面加载完成后立即重定向
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(loadReactApp, 100);
+    });
+  </script>
+
+  <script>
+    // 设置医生模式标识
+    window.DOCTOR_CHAT_MODE = true;
+
+    // 获取URL参数并设置为全局变量
+    const urlParams = new URLSearchParams(window.location.search);
+    window.DOCTOR_PARAMS = {
+      doctor_id: urlParams.get('doctor_id') || urlParams.get('userId') || '',
+      doctor_code: urlParams.get('doctor_code') || '',
+      doctor_name: urlParams.get('doctor_name') || urlParams.get('userName') || '',
+      dept_id: urlParams.get('dept_id') || '',
+      dept_code: urlParams.get('dept_code') || '',
+      dept_name: urlParams.get('dept_name') || '',
+      patient_id: urlParams.get('patient_id') || '',
+      patient_name: urlParams.get('patient_name') || '',
+      patient_bed: urlParams.get('patient_bed') || '',
+      patient_sex: urlParams.get('patient_sex') || '',
+      patient_age: urlParams.get('patient_age') || '',
+      mode: 'doctor'
+    };
+
+    console.log('doctor-chat.html params:', window.DOCTOR_PARAMS);
+
+    // 监听来自父窗口的消息（用于electron集成）
+    window.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'CONTEXT_UPDATE') {
+        console.log('Context update received');
+        // 更新全局参数
+        if (event.data.data) {
+          Object.assign(window.DOCTOR_PARAMS, event.data.data);
+        }
+      }
+    });
+
+    // 向父窗口发送就绪消息
+    setTimeout(() => {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'WEBAPP_READY',
+          data: { mode: 'doctor', params: window.DOCTOR_PARAMS }
+        }, '*');
+      }
+    }, 1000);
+  </script>
+</body>
+
+</html>
