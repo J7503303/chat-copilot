@@ -27,6 +27,7 @@ interface DoctorChatInputProps {
     onSend: () => void;
     disabled?: boolean;
     placeholder?: string;
+    isOffline?: boolean;
 }
 
 export const DoctorChatInput: React.FC<DoctorChatInputProps> = ({
@@ -35,6 +36,7 @@ export const DoctorChatInput: React.FC<DoctorChatInputProps> = ({
     onSend,
     disabled = false,
     placeholder = '请输入您的医学问题或病例描述...',
+    isOffline = false,
 }) => {
     const classes = useClasses();
 
@@ -45,24 +47,31 @@ export const DoctorChatInput: React.FC<DoctorChatInputProps> = ({
         }
     };
 
+    const actualPlaceholder = isOffline 
+        ? '⚠️ AI助手离线中，请稍后重试...' 
+        : placeholder;
+
+    const isDisabled = disabled || isOffline;
+
     return (
         <div className={classes.inputArea}>
             <Input
                 className={classes.input}
-                placeholder={placeholder}
+                placeholder={actualPlaceholder}
                 value={value}
                 onChange={(_, data) => {
                     onChange(data.value);
                 }}
                 onKeyDown={handleKeyPress}
-                disabled={disabled}
+                disabled={isDisabled}
             />
             <Button
                 className={classes.sendButton}
                 icon={<Send24Regular />}
                 appearance="primary"
                 onClick={onSend}
-                disabled={!value.trim() || disabled}
+                disabled={!value.trim() || isDisabled}
+                title={isOffline ? 'AI助手离线中，无法发送消息' : '发送消息'}
             />
         </div>
     );

@@ -52,6 +52,7 @@ export const useDoctorChat = () => {
     const [error, setError] = useState<string | null>(null);
     const [chatService] = useState(() => new ChatService());
     const [isAuthReady, setIsAuthReady] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
     const [_hubConnection, _setHubConnection] = useState<signalR.HubConnection | null>(null);
 
     // 生成GUID
@@ -248,7 +249,10 @@ export const useDoctorChat = () => {
                 logger.info('Initial message setup completed');
                 
             } catch (apiError) {
-                logger.warn('❌ API创建聊天会话失败，使用本地会话:', apiError);
+                logger.warn('❌ API创建聊天会话失败，切换到离线模式:', apiError);
+                
+                // 设置离线状态
+                setIsOffline(true);
                 
                 // 如果API失败，创建本地会话
                 const localSession: IChatSession = {
@@ -260,13 +264,13 @@ export const useDoctorChat = () => {
                 };
                 
                 setChatSession(localSession);
-                logger.info('Using local session (GUID format)');
+                logger.info('Using local session (offline mode)');
                 
                 const welcomeMessage: Message = {
                     id: 'welcome-local',
-                    content: `您好，${doctor.name}！我是您的AI医疗助手。${
-                        doctor.patient ? `\n当前患者：${doctor.patient}` : ''
-                    }${doctor.dept ? `\n所属科室：${doctor.dept}` : ''}\n\n⚠️ 当前使用离线模式，部分功能可能受限。\n\n可能的原因：\n• WebAPI服务未启动\n• 身份验证配置问题\n• 网络连接问题`,
+                    content: `您好，${doctor.name}！\n\n⚠️ AI医疗助手当前处于离线状态。${
+                        doctor.patient ? `\n\n当前患者：${doctor.patient}` : ''
+                    }${doctor.dept ? `\n所属科室：${doctor.dept}` : ''}\n\n**系统状态：** 离线模式\n**可能原因：** 网络连接中断或后端服务不可用\n**建议操作：** 请检查网络连接后重试\n\n如需技术支持，请联系系统管理员。`,
                     isBot: true,
                     timestamp: Date.now(),
                     type: ChatMessageType.Message,
@@ -432,43 +436,12 @@ export const useDoctorChat = () => {
         }
     }, [activeUserInfo, instance, inProgress, chatService, doctorInfo]);
 
-    // 医疗智能回复 - 离线模式下的专业医疗建议
-    const generateSmartResponse = useCallback(async (message: string): Promise<string> => {
-        await new Promise<void>(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    // 离线状态友好提示
+    const showOfflineNotification = useCallback((): string => {
+        const doctorName = doctorInfo?.name || '医生';
+        const patientInfo = doctorInfo?.patient ? `患者：${doctorInfo.patient}` : '';
         
-        const lowerMessage = message.toLowerCase();
-        const patientInfo = doctorInfo?.patient ? `患者${doctorInfo.patient}` : '患者';
-        const deptContext = doctorInfo?.dept ? `在${doctorInfo.dept}` : '';
-        
-        // 医疗专业关键词识别和回复
-        if (lowerMessage.includes('症状') || lowerMessage.includes('病症') || lowerMessage.includes('表现')) {
-            return `🔍 **症状分析建议**\n\n关于"${message}"，建议${deptContext}进行以下评估：\n\n**📋 病史采集**\n• 症状持续时间和发展过程\n• 伴随症状和诱发因素\n• 既往病史和用药史\n\n**🔬 体格检查**\n• 生命体征监测\n• 相关系统体格检查\n• 疼痛评估(如适用)\n\n**🧪 辅助检查**\n• 基础实验室检查\n• 影像学检查(按需)\n• 特殊检查(根据症状)\n\n💡 请结合${patientInfo}的具体情况和临床经验制定个体化诊疗方案。`;
-        }
-        
-        if (lowerMessage.includes('诊断') || lowerMessage.includes('疾病') || lowerMessage.includes('病因')) {
-            return `🎯 **诊断思路建议**\n\n针对"${message}"的诊断，建议遵循循证医学原则：\n\n**🔍 鉴别诊断**\n• 根据主诉建立鉴别诊断清单\n• 按疾病可能性和严重性排序\n• 考虑常见病、多发病优先\n\n**📊 诊断依据**\n• 临床症状和体征\n• 实验室和影像学证据\n• 治疗反应性诊断\n\n**⚠️ 风险评估**\n• 排除危重疾病\n• 评估并发症风险\n• 制定监测计划\n\n${deptContext}的${patientInfo}需要综合评估，请结合最新临床指南制定诊疗方案。`;
-        }
-        
-        if (lowerMessage.includes('治疗') || lowerMessage.includes('用药') || lowerMessage.includes('方案')) {
-            return `💊 **治疗方案建议**\n\n关于"${message}"的治疗，需要考虑以下要素：\n\n**🎯 治疗原则**\n• 个体化治疗方案\n• 获益风险平衡\n• 循证医学指导\n\n**💉 药物治疗**\n• 药物选择和剂量调整\n• 禁忌症和相互作用\n• 不良反应监测\n\n**🔄 非药物治疗**\n• 生活方式干预\n• 物理治疗和康复\n• 心理支持和健康教育\n\n**📈 疗效监测**\n• 定期随访计划\n• 疗效评估指标\n• 方案调整时机\n\n请为${patientInfo}制定安全有效的个体化治疗方案。`;
-        }
-        
-        if (lowerMessage.includes('检查') || lowerMessage.includes('化验') || lowerMessage.includes('影像')) {
-            return `🔬 **检查建议策略**\n\n针对"${message}"的检查需求：\n\n**🎯 检查原则**\n• 基于临床需要选择\n• 成本效益最优化\n• 从基础到复杂递进\n\n**📋 基础检查**\n• 血常规、生化全套\n• 尿常规、便常规\n• 心电图、胸片\n\n**🎭 专科检查**\n• 根据${deptContext}特点选择\n• CT/MRI等影像学检查\n• 内镜、超声等功能检查\n\n**⚡ 急诊检查**\n• 危重症快速筛查\n• 床旁即时检测\n• 紧急影像评估\n\n请根据${patientInfo}的病情轻重缓急合理安排检查项目。`;
-        }
-        
-        if (lowerMessage.includes('护理') || lowerMessage.includes('康复') || lowerMessage.includes('预防')) {
-            return `🤝 **护理康复建议**\n\n关于"${message}"的护理康复：\n\n**👩‍⚕️ 护理要点**\n• 病情观察和监护\n• 基础护理和专科护理\n• 并发症预防措施\n\n**🏃‍♂️ 康复指导**\n• 功能锻炼和活动指导\n• 营养支持和饮食管理\n• 心理疏导和健康教育\n\n**🛡️ 预防措施**\n• 一级预防：病因预防\n• 二级预防：早期发现\n• 三级预防：康复治疗\n\n**📚 健康教育**\n• 疾病相关知识普及\n• 自我管理技能培训\n• 家属参与和支持\n\n${deptContext}的${patientInfo}需要全方位的护理康复支持。`;
-        }
-        
-        // 默认专业医疗回复
-        const responses = [
-            `🩺 **医疗咨询回复**\n\n感谢您关于"${message}"的咨询。作为${deptContext}的AI医疗助手，我建议：\n\n**📋 临床评估**\n• 详细病史采集和体格检查\n• 综合分析临床表现\n• 制定初步诊疗计划\n\n**📖 循证参考**\n• 查阅最新临床指南\n• 参考同类病例经验\n• 考虑多学科会诊\n\n**⚠️ 注意事项**\n• 密切观察病情变化\n• 及时调整治疗方案\n• 加强患者沟通\n\n如需要更具体的建议，请提供${patientInfo}的详细临床信息。`,
-            
-            `🔍 **专业分析建议**\n\n针对您提到的"${message}"，${deptContext}诊疗建议：\n\n**🎯 诊疗思路**\n• 系统性临床思维\n• 个体化评估方案\n• 规范化诊疗流程\n\n**📊 决策支持**\n• 临床决策树分析\n• 风险效益评估\n• 多方案比较选择\n\n**🤝 团队协作**\n• 医护协同配合\n• 多学科团队讨论\n• 患者参与决策\n\n我会继续为${patientInfo}的诊疗提供专业支持。`,
-        ];
-        
-        return responses[Math.floor(Math.random() * responses.length)];
+        return `⚠️ **系统提示**\n\n${doctorName}，您好！\n\nAI助手当前处于离线状态。${patientInfo ? `\n\n${patientInfo}的咨询暂时无法处理。` : ''}\n\n**可能的原因：**\n• 网络连接中断\n• 后端服务暂时不可用\n• 系统正在维护\n\n**建议操作：**\n• 检查网络连接\n• 稍后重试发送消息\n• 如问题持续，请联系技术支持\n\n感谢您的理解！`;
     }, [doctorInfo]);
 
     // 发送消息
@@ -507,31 +480,28 @@ export const useDoctorChat = () => {
             logger.info('Message sent successfully via API');
             
         } catch (err) {
-            logger.error('发送消息失败，尝试离线模式:', err);
+            logger.error('发送消息失败，显示离线提示:', err);
             
-            try {
-                // 如果API失败，使用离线回复
-                const offlineResponse = await generateSmartResponse(messageContent);
-                const botMessage: Message = {
-                    id: `bot-offline-${Date.now()}`,
-                    content: offlineResponse,
-                    isBot: true,
-                    timestamp: Date.now(),
-                    type: ChatMessageType.Message,
-                    authorRole: AuthorRoles.Bot,
-                };
-                
-                setMessages(prev => [...prev, botMessage]);
-                logger.info('Message sent successfully via offline mode');
-                
-            } catch (offlineErr) {
-                logger.error('❌ 离线回复也失败了:', offlineErr);
-                setError(err instanceof Error ? err.message : '发送消息失败');
-            }
+            // 设置离线状态
+            setIsOffline(true);
+            
+            // 显示友好的离线提示
+            const offlineNotification = showOfflineNotification();
+            const botMessage: Message = {
+                id: `bot-offline-${Date.now()}`,
+                content: offlineNotification,
+                isBot: true,
+                timestamp: Date.now(),
+                type: ChatMessageType.Message,
+                authorRole: AuthorRoles.Bot,
+            };
+            
+            setMessages(prev => [...prev, botMessage]);
+            logger.info('Offline notification shown to user');
         } finally {
             setIsLoading(false);
         }
-    }, [inputValue, isLoading, doctorInfo, chatSession, callChatAPI, generateSmartResponse]);
+    }, [inputValue, isLoading, doctorInfo, chatSession, callChatAPI, showOfflineNotification]);
 
     // 设置用户信息的Effect
     useEffect(() => {
@@ -549,6 +519,7 @@ export const useDoctorChat = () => {
         isLoading,
         error,
         isAuthReady,
+        isOffline,
         
         // 方法
         setDoctorInfo,

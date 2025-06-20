@@ -33,6 +33,7 @@ interface DoctorChatRoomProps {
     onSendMessage: () => void;
     isLoading?: boolean;
     error?: string | null;
+    isOffline?: boolean;
 }
 
 export const DoctorChatRoom: React.FC<DoctorChatRoomProps> = ({
@@ -43,6 +44,7 @@ export const DoctorChatRoom: React.FC<DoctorChatRoomProps> = ({
     onSendMessage,
     isLoading = false,
     error = null,
+    isOffline = false,
 }) => {
     const classes = useClasses();
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,7 @@ export const DoctorChatRoom: React.FC<DoctorChatRoomProps> = ({
                 onChange={onInputChange}
                 onSend={onSendMessage}
                 disabled={isLoading}
+                isOffline={isOffline}
             />
         </div>
     );

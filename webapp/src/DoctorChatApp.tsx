@@ -35,6 +35,7 @@ const DoctorChatApp: React.FC = () => {
         isLoading,
         error,
         isAuthReady,
+        isOffline,
         setDoctorInfo,
         setInputValue,
         createNewChat,
@@ -138,6 +139,7 @@ const DoctorChatApp: React.FC = () => {
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
                     error={error}
+                    isOffline={isOffline}
                 />
                 
                 {/* 历史记录抽屉组件将在后续实现 */}
