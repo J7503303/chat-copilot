@@ -34,10 +34,12 @@ const DoctorChatApp: React.FC = () => {
         inputValue,
         isLoading,
         error,
+        isAuthReady,
         setDoctorInfo,
         setInputValue,
         createNewChat,
         sendMessage,
+        initializeChatSession,
     } = useDoctorChat();
 
     // 获取医生参数的函数
@@ -65,6 +67,9 @@ const DoctorChatApp: React.FC = () => {
 
     // 初始化医生信息
     useEffect(() => {
+        // 只有在身份验证准备就绪后才初始化医生信息
+        if (!isAuthReady) return;
+
         const { doctorId, doctorName, deptName, patientName } = getDoctorParams();
 
         if (!doctorId) {
@@ -79,20 +84,8 @@ const DoctorChatApp: React.FC = () => {
         };
 
         setDoctorInfo(info);
-        
-        // 添加欢迎消息
-        const welcomeMessage = {
-            id: 'welcome-refactored',
-            content: `您好，${info.name}！我是您的AI医疗助手。${
-                info.patient ? `\n当前患者：${info.patient}` : ''
-            }${info.dept ? `\n所属科室：${info.dept}` : ''}\n\n✨ 这是重构后的医生聊天界面，架构更清晰，维护更容易！`,
-            isBot: true,
-            timestamp: Date.now(),
-        };
-        
-        // 这里需要添加设置消息的逻辑
-        console.log('Welcome message created:', welcomeMessage);
-    }, [getDoctorParams, setDoctorInfo]);
+        void initializeChatSession(info);
+    }, [isAuthReady, getDoctorParams, setDoctorInfo, initializeChatSession]);
 
     const handleShowHistory = () => {
         setIsHistoryDrawerOpen(true);
