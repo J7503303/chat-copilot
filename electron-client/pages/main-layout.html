@@ -721,18 +721,48 @@
     }
 
     // 设置上下文信息（供外部调用）
-    function setContextInfo(info) {
-      if (info.patientId !== undefined) contextInfo.patientId = info.patientId;
-      if (info.patientName !== undefined) contextInfo.patientName = info.patientName;
-      if (info.patientBed !== undefined) contextInfo.patientBed = info.patientBed;
-      if (info.patientSex !== undefined) contextInfo.patientSex = info.patientSex;
-      if (info.patientAge !== undefined) contextInfo.patientAge = info.patientAge;
-      if (info.deptId !== undefined) contextInfo.deptId = info.deptId;
-      if (info.deptName !== undefined) contextInfo.deptName = info.deptName;
-      if (info.doctorId !== undefined) contextInfo.doctorId = info.doctorId;
-      if (info.doctorName !== undefined) contextInfo.doctorName = info.doctorName;
+    function setContextInfo(info, forceUpdate = false) {
+      // forceUpdate为true时，强制更新所有字段（用于重置）
+      // 否则只在参数存在时更新（包括空字符串，用于清空显示）
+
+      if (forceUpdate || info.hasOwnProperty('patientId')) contextInfo.patientId = info.patientId || '';
+      if (forceUpdate || info.hasOwnProperty('patientName')) contextInfo.patientName = info.patientName || '';
+      if (forceUpdate || info.hasOwnProperty('patientBed')) contextInfo.patientBed = info.patientBed || '';
+      if (forceUpdate || info.hasOwnProperty('patientSex')) contextInfo.patientSex = info.patientSex || '';
+      if (forceUpdate || info.hasOwnProperty('patientAge')) contextInfo.patientAge = info.patientAge || '';
+      if (forceUpdate || info.hasOwnProperty('deptId')) contextInfo.deptId = info.deptId || '';
+      if (forceUpdate || info.hasOwnProperty('deptName')) contextInfo.deptName = info.deptName || '';
+      if (forceUpdate || info.hasOwnProperty('doctorId')) contextInfo.doctorId = info.doctorId || '';
+      if (forceUpdate || info.hasOwnProperty('doctorName')) contextInfo.doctorName = info.doctorName || '';
 
       updatePatientInfo();
+    }
+
+    // 重置所有上下文信息（供外部调用）
+    function resetContextInfo() {
+      contextInfo = {
+        patientId: '',
+        patientName: '',
+        patientBed: '',
+        patientSex: '',
+        patientAge: '',
+        deptId: '',
+        deptName: '',
+        doctorId: '',
+        doctorName: ''
+      };
+
+      updatePatientInfo();
+
+      // 同时重置当前页面的iframe
+      const iframe = document.getElementById('contentFrame');
+      if (iframe && iframe.contentWindow && iframe.contentWindow.setContextInfo) {
+        try {
+          iframe.contentWindow.setContextInfo(contextInfo);
+        } catch (e) {
+          // 忽略错误
+        }
+      }
     }
 
     // 获取上下文信息（供页面使用）
@@ -807,32 +837,47 @@
         if (data.params) {
           const newContextInfo = {};
 
-          // 处理医生信息
+          // 处理医生信息 - 现在所有参数都会被处理（包括空值）
           if (data.params.doctor) {
-            if (data.params.doctor.id) newContextInfo.doctorId = data.params.doctor.id;
-            if (data.params.doctor.code) newContextInfo.doctorCode = data.params.doctor.code;
-            if (data.params.doctor.name) newContextInfo.doctorName = data.params.doctor.name;
+            newContextInfo.doctorId = data.params.doctor.id || '';
+            newContextInfo.doctorCode = data.params.doctor.code || '';
+            newContextInfo.doctorName = data.params.doctor.name || '';
           }
 
-          // 处理科室信息
+          // 处理科室信息 - 现在所有参数都会被处理（包括空值）
           if (data.params.department) {
-            if (data.params.department.id) newContextInfo.deptId = data.params.department.id;
-            if (data.params.department.code) newContextInfo.deptCode = data.params.department.code;
-            if (data.params.department.name) newContextInfo.deptName = data.params.department.name;
+            newContextInfo.deptId = data.params.department.id || '';
+            newContextInfo.deptCode = data.params.department.code || '';
+            newContextInfo.deptName = data.params.department.name || '';
           }
 
-          // 处理患者信息
+          // 处理患者信息 - 现在所有参数都会被处理（包括空值）
           if (data.params.patient) {
-            if (data.params.patient.id) newContextInfo.patientId = data.params.patient.id;
-            if (data.params.patient.name) newContextInfo.patientName = data.params.patient.name;
-            if (data.params.patient.bed) newContextInfo.patientBed = data.params.patient.bed;
-            if (data.params.patient.sex) newContextInfo.patientSex = data.params.patient.sex;
-            if (data.params.patient.age) newContextInfo.patientAge = data.params.patient.age;
+            newContextInfo.patientId = data.params.patient.id || '';
+            newContextInfo.patientName = data.params.patient.name || '';
+            newContextInfo.patientBed = data.params.patient.bed || '';
+            newContextInfo.patientSex = data.params.patient.sex || '';
+            newContextInfo.patientAge = data.params.patient.age || '';
           }
 
-          // 更新上下文信息
-          setContextInfo(newContextInfo);
+          // 使用forceUpdate=true强制更新所有字段
+          setContextInfo(newContextInfo, true);
 
+        } else if (data.reset) {
+          // 如果是重置请求，清空所有信息
+          resetContextInfo();
+
+          // 同时向chat iframe发送重置消息
+          const iframe = document.getElementById('contentFrame');
+          if (iframe && iframe.contentWindow) {
+            try {
+              iframe.contentWindow.postMessage({
+                type: 'RESET'
+              }, '*');
+            } catch (e) {
+              // 忽略错误
+            }
+          }
         }
 
         // 切换页面（如果指定了页面）

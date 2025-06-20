@@ -527,6 +527,22 @@
     function setupWebappCommunication() {
       // 监听来自webapp的消息
       window.addEventListener('message', (event) => {
+        // 处理来自main-layout的重置消息
+        if (event.data && event.data.type === 'RESET') {
+          console.log('收到重置消息，转发给webapp');
+          const iframe = document.getElementById('webappFrame');
+          if (iframe && iframe.contentWindow) {
+            try {
+              iframe.contentWindow.postMessage({
+                type: 'RESET'
+              }, 'http://localhost:8440');
+            } catch (e) {
+              // 忽略错误
+            }
+          }
+          return;
+        }
+
         // 确保消息来自webapp
         if (event.origin !== 'http://localhost:8440') {
           return;
@@ -652,42 +668,47 @@
 
     // 实现setContextInfo函数，供main-layout.html调用
     window.setContextInfo = function (contextInfo) {
-
-
       if (contextInfo) {
-        // 将上下文信息转换为导航参数格式
+        // 将上下文信息转换为导航参数格式，保留空值用于清空显示
         const navigationParams = {
           page: 'chat',
           params: {
-            doctor: {
-              id: contextInfo.doctorId,
-              code: contextInfo.doctorCode,
-              name: contextInfo.doctorName
-            },
-            department: {
-              id: contextInfo.deptId,
-              code: contextInfo.deptCode,
-              name: contextInfo.deptName
-            },
-            patient: {
-              id: contextInfo.patientId,
-              name: contextInfo.patientName,
-              bed: contextInfo.patientBed,
-              sex: contextInfo.patientSex,
-              age: contextInfo.patientAge
-            }
+            doctor: {},
+            department: {},
+            patient: {}
           },
           timestamp: new Date().toISOString()
         };
 
+        // 医生信息 - 包括空值
+        if (contextInfo.hasOwnProperty('doctorId')) navigationParams.params.doctor.id = contextInfo.doctorId || '';
+        if (contextInfo.hasOwnProperty('doctorCode')) navigationParams.params.doctor.code = contextInfo.doctorCode || '';
+        if (contextInfo.hasOwnProperty('doctorName')) navigationParams.params.doctor.name = contextInfo.doctorName || '';
 
+        // 科室信息 - 包括空值
+        if (contextInfo.hasOwnProperty('deptId')) navigationParams.params.department.id = contextInfo.deptId || '';
+        if (contextInfo.hasOwnProperty('deptCode')) navigationParams.params.department.code = contextInfo.deptCode || '';
+        if (contextInfo.hasOwnProperty('deptName')) navigationParams.params.department.name = contextInfo.deptName || '';
+
+        // 患者信息 - 包括空值
+        if (contextInfo.hasOwnProperty('patientId')) navigationParams.params.patient.id = contextInfo.patientId || '';
+        if (contextInfo.hasOwnProperty('patientName')) navigationParams.params.patient.name = contextInfo.patientName || '';
+        if (contextInfo.hasOwnProperty('patientBed')) navigationParams.params.patient.bed = contextInfo.patientBed || '';
+        if (contextInfo.hasOwnProperty('patientSex')) navigationParams.params.patient.sex = contextInfo.patientSex || '';
+        if (contextInfo.hasOwnProperty('patientAge')) navigationParams.params.patient.age = contextInfo.patientAge || '';
+
+        // 清理空对象
+        Object.keys(navigationParams.params).forEach(key => {
+          if (Object.keys(navigationParams.params[key]).length === 0) {
+            delete navigationParams.params[key];
+          }
+        });
 
         // 更新currentNavigationParams并重新加载iframe
         currentNavigationParams = navigationParams;
         const iframe = document.getElementById('webappFrame');
         if (iframe) {
           const newUrl = buildWebappUrl();
-
           iframe.src = newUrl;
         }
       }

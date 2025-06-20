@@ -473,13 +473,13 @@ const DoctorChatApp: React.FC = () => {
             };
         }
         
-        // 从URL参数获取医生信息
+        // 从URL参数获取医生信息，空字符串也作为有效值（用于清空显示）
         const params = new URLSearchParams(window.location.search);
         return {
-            doctorId: params.get('doctor_id') ?? params.get('userId'),
-            doctorName: params.get('doctor_name') ?? params.get('userName'),
-            deptName: params.get('dept_name'),
-            patientName: params.get('patient_name')
+            doctorId: params.get('doctor_id') ?? params.get('userId') ?? '',
+            doctorName: params.get('doctor_name') ?? params.get('userName') ?? '',
+            deptName: params.get('dept_name') ?? '',
+            patientName: params.get('patient_name') ?? ''
         };
     }, []);
 
@@ -523,8 +523,8 @@ const DoctorChatApp: React.FC = () => {
             const info: DoctorInfo = {
                 id: newParams.doctorId,
                 name: userName,
-                dept: newParams.deptName ?? undefined,
-                patient: newParams.patientName ?? undefined,
+                dept: newParams.deptName || undefined,
+                patient: newParams.patientName || undefined,
             };
             
             // 清空当前状态并重新初始化
@@ -583,9 +583,9 @@ const DoctorChatApp: React.FC = () => {
 
         const info: DoctorInfo = {
             id: doctorId,
-            name: doctorName ?? `医生${doctorId}`,
-            dept: deptName ?? undefined,
-            patient: patientName ?? undefined,
+            name: doctorName || `医生${doctorId}`,
+            dept: deptName || undefined,
+            patient: patientName || undefined,
         };
 
         setDoctorInfo(info);
@@ -636,14 +636,44 @@ const DoctorChatApp: React.FC = () => {
                     
                     const info: DoctorInfo = {
                         id: params.doctorId,
-                        name: params.doctorName ?? `医生${params.doctorId}`,
-                        dept: params.deptName ?? undefined,
-                        patient: params.patientName ?? undefined,
+                        name: params.doctorName || `医生${params.doctorId}`,
+                        dept: params.deptName || undefined,
+                        patient: params.patientName || undefined,
                     };
                     
                     setDoctorInfo(info);
                     void initializeChatSession(info);
                 }
+            } else if (event.data && event.data.type === 'RESET') {
+                // 处理重置消息
+                console.log('收到重置消息，清空所有状态');
+                
+                // 清空所有状态
+                setMessages([]);
+                setChatSession(null);
+                setDoctorInfo(null);
+                setError(null);
+                setInputValue('');
+                
+                // 清空全局参数
+                if ((window as any).DOCTOR_PARAMS) {
+                    (window as any).DOCTOR_PARAMS = {
+                        doctor_id: '',
+                        doctor_name: '',
+                        dept_name: '',
+                        patient_name: '',
+                        mode: 'doctor'
+                    };
+                }
+                
+                // 清空所有本地存储的聊天历史
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('doctor-chat-')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                console.log('重置完成');
             }
         };
 
