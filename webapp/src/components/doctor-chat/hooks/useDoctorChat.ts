@@ -186,10 +186,74 @@ export const useDoctorChat = () => {
         }
     }, [instance, dispatch, doctorInfo]);
 
+    // 加载聊天历史
+    const loadChatHistory = useCallback((doctorId: string) => {
+        try {
+            logger.info('Loading chat history for doctor:', doctorId);
+            const storageKey = getStorageKey(doctorId);
+            const savedData = localStorage.getItem(storageKey);
+            
+            if (savedData) {
+                const chatData = JSON.parse(savedData) as DoctorChatHistoryData;
+                logger.info('📂 找到聊天历史数据:', {
+                    doctorId: chatData.doctorInfo?.id,
+                    currentChatId: chatData.currentChatId,
+                    sessionCount: Object.keys(chatData.chatSessions || {}).length,
+                    timestamp: new Date(chatData.timestamp).toLocaleString()
+                });
+                
+                // 如果历史记录不超过7天，则恢复
+                const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
+                if (Date.now() - chatData.timestamp < maxAge) {
+                    // 验证医生ID是否匹配
+                    if (chatData.doctorInfo?.id !== doctorId) {
+                        logger.warn('⚠️ 聊天历史中的医生ID不匹配，删除历史记录');
+                        localStorage.removeItem(storageKey);
+                        return false;
+                    }
+                    
+                    // 恢复聊天会话数据
+                    setChatSessions(chatData.chatSessions || {});
+                    setCurrentChatId(chatData.currentChatId || '');
+                    
+                    // 恢复当前聊天会话
+                    const currentSession = chatData.chatSessions?.[chatData.currentChatId];
+                    if (currentSession) {
+                        setMessages(currentSession.messages || []);
+                        setChatSession(currentSession.chatSession);
+                        logger.info('✅ Chat history restored successfully');
+                        return true;
+                    }
+                } else {
+                    // 历史记录过期，删除
+                    localStorage.removeItem(storageKey);
+                    logger.info('🗑️ Expired chat history deleted');
+                }
+            } else {
+                logger.info('📭 No chat history found');
+            }
+        } catch (err) {
+            logger.warn('❌ 加载聊天历史失败:', err);
+        }
+        return false;
+    }, [getStorageKey]);
+
     // 初始化聊天会话
     const initializeChatSession = useCallback(async (doctor: DoctorInfo) => {
         try {
             logger.info('Initializing chat session');
+            
+            // 尝试从本地存储加载历史记录
+            if (loadChatHistory(doctor.id)) {
+                logger.info('✅ Restored chat history from local storage');
+                return;
+            }
+            
+            logger.info('🆕 Creating new chat session');
+            
+            // 生成新的聊天ID
+            const newChatId = generateGUID();
+            setCurrentChatId(newChatId);
             
             // 创建新的聊天会话 - 使用真实的API
             const chatTitle = `${doctor.name} - 医生聊天 @ ${new Date().toLocaleString()}`;
@@ -223,29 +287,20 @@ export const useDoctorChat = () => {
                 setChatSession(apiSession);
                 logger.info('Chat session created successfully');
                 
-                // 添加初始消息（来自后端）
-                const initialMessage: Message = {
-                    id: result.initialBotMessage.id ?? `initial-${Date.now()}`,
-                    content: result.initialBotMessage.content,
-                    isBot: true,
-                    timestamp: result.initialBotMessage.timestamp ?? Date.now(),
-                    type: result.initialBotMessage.type,
-                    authorRole: result.initialBotMessage.authorRole,
-                };
-
-                // 添加医生专用欢迎消息
-                const welcomeMessage: Message = {
+                // 为医生聊天界面创建专用欢迎消息，不使用后端的通用欢迎语
+                const doctorWelcomeMessage: Message = {
                     id: 'doctor-welcome',
                     content: `您好，${doctor.name}！我是您的AI医疗助手。${
-                        doctor.patient ? `\n当前患者：${doctor.patient}` : ''
-                    }${doctor.dept ? `\n所属科室：${doctor.dept}` : ''}\n\n🔗 已连接到后端API，您现在可以享受完整的AI聊天功能！`,
+                        doctor.patient ? `\n\n**当前患者：** ${doctor.patient}` : ''
+                    }${doctor.dept ? `\n**所属科室：** ${doctor.dept}` : ''}\n\n🩺 **服务功能：**\n• 医学咨询与诊断建议\n• 病例分析与治疗方案\n• 医学文献查询与解读\n• 临床决策支持\n\n🔗 **系统状态：** 已连接到后端API\n\n请问有什么可以帮助您的吗？`,
                     isBot: true,
                     timestamp: Date.now(),
                     type: ChatMessageType.Message,
                     authorRole: AuthorRoles.Bot,
                 };
                 
-                setMessages([initialMessage, welcomeMessage]);
+                // 只使用医生专用欢迎消息，忽略后端的通用欢迎语
+                setMessages([doctorWelcomeMessage]);
                 logger.info('Initial message setup completed');
                 
             } catch (apiError) {
@@ -284,7 +339,7 @@ export const useDoctorChat = () => {
             logger.error('❌ 初始化聊天会话失败:', err);
             setError('初始化聊天会话失败：' + (err instanceof Error ? err.message : '未知错误'));
         }
-    }, [instance, inProgress, chatService, generateGUID]);
+    }, [instance, inProgress, chatService, generateGUID, loadChatHistory]);
 
     // 创建新聊天
     const createNewChat = useCallback(() => {
@@ -503,6 +558,23 @@ export const useDoctorChat = () => {
         }
     }, [inputValue, isLoading, doctorInfo, chatSession, callChatAPI, showOfflineNotification]);
 
+    // 自动保存聊天历史 - 使用防抖机制减少频繁写入
+    useEffect(() => {
+        if (!doctorInfo || !currentChatId || messages.length <= 1) return; // 排除只有欢迎消息的情况
+        
+        // 防抖保存，避免频繁写入localStorage
+        const saveTimeoutId = setTimeout(() => {
+            try {
+                saveChatSessions(doctorInfo);
+                logger.debug('✅ Auto-saved chat history');
+            } catch (error) {
+                logger.warn('❌ 自动保存聊天历史失败:', error);
+            }
+        }, 2000); // 2秒防抖
+
+        return () => clearTimeout(saveTimeoutId);
+    }, [messages, doctorInfo, chatSession, currentChatId, saveChatSessions]);
+
     // 设置用户信息的Effect
     useEffect(() => {
         void setupUserInfo();
@@ -537,6 +609,7 @@ export const useDoctorChat = () => {
         generateGUID,
         generateChatTitle,
         getStorageKey,
+        loadChatHistory,
         setupUserInfo,
         initializeChatSession,
     };
