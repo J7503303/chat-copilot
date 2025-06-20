@@ -918,8 +918,15 @@ const DoctorChatApp: React.FC = () => {
             
         } catch (err) {
             console.error('❌ 发送消息失败:', err);
-            setError(err instanceof Error ? err.message : '发送消息失败');
             setIsLoading(false);
+            
+            // 检查是否是会话过期错误
+            if (err instanceof Error && err.message.includes('会话已过期')) {
+                // 不显示错误消息，因为callChatAPI已经处理了会话过期的情况
+                return;
+            }
+            
+            setError(err instanceof Error ? err.message : '发送消息失败');
             
             // 如果API调用失败，但不是因为SignalR问题，添加一个离线回复
             if (!err?.toString().includes('SignalR')) {
@@ -1107,6 +1114,32 @@ const DoctorChatApp: React.FC = () => {
             
         } catch (err) {
             console.error('❌ API调用失败，错误详情:', err);
+            
+            // 检查是否是会话不存在错误 (404)
+            if (err instanceof Error && (err.message.includes('404') || err.message.includes('Failed to find chat session'))) {
+                console.log('Chat session not found (404), clearing invalid session and switching to offline mode');
+                
+                // 清除无效的会话和历史记录
+                if (doctorInfo) {
+                    const storageKey = getStorageKey(doctorInfo.id);
+                    localStorage.removeItem(storageKey);
+                    
+                    // 添加提示消息
+                    const warningMessage: Message = {
+                        id: `warning-${Date.now()}`,
+                        content: '⚠️ 检测到会话已过期，已清除无效数据。请点击"清除记录"按钮重新开始，或继续使用离线模式。',
+                        isBot: true,
+                        timestamp: Date.now(),
+                        type: ChatMessageType.Message,
+                        authorRole: AuthorRoles.Bot,
+                    };
+                    
+                    setMessages(prev => [...prev, warningMessage]);
+                }
+                
+                // 使用离线模式回复当前消息
+                return await generateSmartResponse(message);
+            }
             
             // 检查是否是身份验证错误
             if (err instanceof Error && (err.message.includes('401') || err.message.includes('访问令牌'))) {

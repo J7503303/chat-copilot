@@ -45,6 +45,27 @@ export const useClasses = makeStyles({
     },
 });
 
+// 定义医生模式的类型接口
+interface DoctorModeState {
+    isDoctorMode: boolean;
+    doctorId: string;
+    doctorName: string;
+    deptName: string;
+    patientName: string;
+}
+
+// 更好的做法是使用Record类型
+type UrlParamsRecord = Record<string, string>;
+
+// 定义postMessage数据的类型接口
+interface PostMessageData {
+    type: string;
+    data: {
+        url: string;
+        params: UrlParamsRecord;
+    };
+}
+
 export enum AppState {
     ProbeForBackend,
     SettingUserInfo,
@@ -56,13 +77,10 @@ export enum AppState {
     SigningOut,
 }
 
-// 检查是否为医生聊天模式
-const checkDoctorChatMode = () => {
+const checkDoctorChatMode = (): DoctorModeState => {
     const params = new URLSearchParams(window.location.search);
     const doctorId = params.get('doctor_id') ?? params.get('userId');
-    const isDoctor = params.get('mode') === 'doctor' || !!doctorId;
-    
-    console.log('Doctor mode detection:', { isDoctor, doctorId });
+    const isDoctor = doctorId !== null && doctorId.trim() !== '';
     
     return {
         isDoctorMode: isDoctor,
@@ -85,25 +103,27 @@ const App = () => {
     const file = useFile();
 
     // 检查医生聊天模式 - 监听URL参数变化
-    const [doctorMode, setDoctorMode] = React.useState(() => checkDoctorChatMode());
+    const [doctorMode, setDoctorMode] = React.useState<DoctorModeState>(() => checkDoctorChatMode());
 
     // 通知父窗口URL参数变化（用于electron集成）
-    const notifyParentOfUrlChange = React.useCallback((newDoctorMode: any) => {
-        if (newDoctorMode.isDoctorMode && window.parent && window.parent !== window) {
+    const notifyParentOfUrlChange = React.useCallback((newDoctorMode: DoctorModeState) => {
+        if (newDoctorMode.isDoctorMode && window.parent !== window) {
             try {
                 const params = new URLSearchParams(window.location.search);
-                const paramObj: any = {};
+                const paramObj: UrlParamsRecord = {};
                 params.forEach((value, key) => {
                     paramObj[key] = value;
                 });
                 
-                window.parent.postMessage({
+                const messageData: PostMessageData = {
                     type: 'URL_CHANGED',
                     data: {
                         url: window.location.href,
                         params: paramObj
                     }
-                }, '*');
+                };
+                
+                window.parent.postMessage(messageData, '*');
             } catch (e) {
                 // 忽略跨域错误
             }
@@ -111,7 +131,7 @@ const App = () => {
     }, []);
 
     // 处理URL参数变化
-    const handleDoctorModeChange = React.useCallback((newDoctorMode: any) => {
+    const handleDoctorModeChange = React.useCallback((newDoctorMode: DoctorModeState) => {
         if (JSON.stringify(newDoctorMode) !== JSON.stringify(doctorMode)) {
             setDoctorMode(newDoctorMode);
             notifyParentOfUrlChange(newDoctorMode);
@@ -120,17 +140,23 @@ const App = () => {
 
     // 监听URL参数变化
     React.useEffect(() => {
+        let lastUrl = window.location.href;
+        
         const checkAndUpdate = () => {
-            const newDoctorMode = checkDoctorChatMode();
-            handleDoctorModeChange(newDoctorMode);
+            // 只有URL实际改变时才检查
+            if (window.location.href !== lastUrl) {
+                lastUrl = window.location.href;
+                const newDoctorMode = checkDoctorChatMode();
+                handleDoctorModeChange(newDoctorMode);
+            }
         };
 
         // 监听各种URL变化事件
         window.addEventListener('popstate', checkAndUpdate);
         window.addEventListener('hashchange', checkAndUpdate);
         
-        // 定期检查URL参数变化（备选方案）
-        const intervalId = setInterval(checkAndUpdate, 1000);
+        // 定期检查URL参数变化（备选方案，但减少频率）
+        const intervalId = setInterval(checkAndUpdate, 5000);
         
         return () => {
             window.removeEventListener('popstate', checkAndUpdate);
@@ -155,7 +181,6 @@ const App = () => {
                         username: account.name ?? account.username,
                     }),
                 );
-                console.log('Doctor mode: User info set for', account.username);
             }
         }
     }, [isAuthenticated, doctorMode.isDoctorMode, instance, dispatch]);
