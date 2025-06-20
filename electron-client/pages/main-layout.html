@@ -652,7 +652,7 @@
       if (window.electronAPI && window.electronAPI.windowMinimize) {
         window.electronAPI.windowMinimize();
       } else {
-        console.log('🔥🔥🔥 MINIMIZE_WINDOW_NOW');
+        // 最小化窗口
       }
     }
 
@@ -661,7 +661,7 @@
       if (window.electronAPI && window.electronAPI.windowClose) {
         window.electronAPI.windowClose();
       } else {
-        console.log('🔥🔥🔥 CLOSE_WINDOW_NOW');
+        // 关闭窗口
       }
     }
 
@@ -801,7 +801,7 @@
     // 监听导航参数事件
     if (window.electronAPI && window.electronAPI.onNavigationParams) {
       window.electronAPI.onNavigationParams((data) => {
-        console.log('收到导航参数:', data);
+
 
         // 更新上下文信息
         if (data.params) {
@@ -832,12 +832,33 @@
 
           // 更新上下文信息
           setContextInfo(newContextInfo);
-          console.log('更新后的上下文信息:', contextInfo);
+
         }
 
         // 切换页面（如果指定了页面）
         if (data.page && data.page !== currentPage) {
+
           switchPage(data.page);
+        } else if (currentPage === 'chat') {
+          // 如果当前就是chat页面，直接传递上下文信息给iframe
+
+          const iframe = document.getElementById('contentFrame');
+          if (iframe && iframe.contentWindow && iframe.contentWindow.setContextInfo) {
+            try {
+              iframe.contentWindow.setContextInfo(contextInfo);
+            } catch (e) {
+              // 如果直接调用失败，延迟重试
+              setTimeout(() => {
+                try {
+                  if (iframe.contentWindow && iframe.contentWindow.setContextInfo) {
+                    iframe.contentWindow.setContextInfo(contextInfo);
+                  }
+                } catch (e2) {
+                  // 忽略错误
+                }
+              }, 500);
+            }
+          }
         }
       });
     }

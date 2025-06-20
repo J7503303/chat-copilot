@@ -415,7 +415,7 @@
 
       if (currentNavigationParams && currentNavigationParams.params) {
         const { doctor, department, patient } = currentNavigationParams.params;
-        console.log('Building URL with params:', { doctor: doctor?.name, department: department?.name, patient: patient?.name });
+
 
         // 添加医生信息
         if (doctor?.id) params.append('doctor_id', doctor.id);
@@ -434,7 +434,7 @@
         if (patient?.sex) params.append('patient_sex', patient.sex);
         if (patient?.age) params.append('patient_age', patient.age);
       } else {
-        console.warn('No navigation params, using defaults');
+
         // 如果没有参数，添加默认值
         params.append('doctor_id', 'doctor_001');
         params.append('doctor_name', '张医生');
@@ -443,7 +443,7 @@
 
       const queryString = params.toString();
       const finalUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-      console.log('Built webapp URL:', finalUrl);
+
       return finalUrl;
     }
 
@@ -486,6 +486,9 @@
       const initialUrl = buildWebappUrl();
       iframe.src = initialUrl;
 
+      // 启动webapp通信监听
+      setupWebappCommunication();
+
       // 初始检查webapp服务
       setTimeout(async () => {
         const isAvailable = await checkWebappService();
@@ -504,12 +507,13 @@
     if (window.electronAPI && window.electronAPI.onNavigationParams) {
       console.log('Navigation params listener registered');
       window.electronAPI.onNavigationParams((params) => {
-        console.log('Received navigation params:', params.page);
+
         currentNavigationParams = params;
 
         // 重新加载iframe以应用新参数
         const iframe = document.getElementById('webappFrame');
         const newUrl = buildWebappUrl();
+
         iframe.src = newUrl;
       });
     } else {
@@ -518,6 +522,93 @@
 
     // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', initialize);
+
+    // 监听来自webapp的URL变化通知
+    function setupWebappCommunication() {
+      // 监听来自webapp的消息
+      window.addEventListener('message', (event) => {
+        // 确保消息来自webapp
+        if (event.origin !== 'http://localhost:8440') {
+          return;
+        }
+
+        if (event.data && event.data.type === 'URL_CHANGED') {
+          console.log('收到webapp URL变化通知:', event.data);
+
+          const urlData = event.data.data;
+          if (urlData && urlData.params) {
+            // 构建新的导航参数
+            const newNavigationParams = {
+              page: 'chat',
+              params: {
+                doctor: {
+                  id: urlData.params.doctor_id,
+                  code: urlData.params.doctor_code,
+                  name: urlData.params.doctor_name
+                },
+                department: {
+                  id: urlData.params.dept_id,
+                  code: urlData.params.dept_code,
+                  name: urlData.params.dept_name
+                },
+                patient: {
+                  id: urlData.params.patient_id,
+                  name: urlData.params.patient_name,
+                  bed: urlData.params.patient_bed,
+                  sex: urlData.params.patient_sex,
+                  age: urlData.params.patient_age
+                }
+              },
+              timestamp: new Date().toISOString()
+            };
+
+            // 清理空值
+            Object.keys(newNavigationParams.params).forEach(key => {
+              const obj = newNavigationParams.params[key];
+              Object.keys(obj).forEach(subKey => {
+                if (!obj[subKey]) {
+                  delete obj[subKey];
+                }
+              });
+              if (Object.keys(obj).length === 0) {
+                delete newNavigationParams.params[key];
+              }
+            });
+
+            // 更新当前导航参数
+            currentNavigationParams = newNavigationParams;
+            console.log('更新导航参数:', newNavigationParams);
+
+            // 通知主布局更新上下文信息
+            if (window.parent && window.parent.mainLayout) {
+              const contextInfo = {};
+              if (newNavigationParams.params.doctor) {
+                if (newNavigationParams.params.doctor.id) contextInfo.doctorId = newNavigationParams.params.doctor.id;
+                if (newNavigationParams.params.doctor.code) contextInfo.doctorCode = newNavigationParams.params.doctor.code;
+                if (newNavigationParams.params.doctor.name) contextInfo.doctorName = newNavigationParams.params.doctor.name;
+              }
+              if (newNavigationParams.params.department) {
+                if (newNavigationParams.params.department.id) contextInfo.deptId = newNavigationParams.params.department.id;
+                if (newNavigationParams.params.department.code) contextInfo.deptCode = newNavigationParams.params.department.code;
+                if (newNavigationParams.params.department.name) contextInfo.deptName = newNavigationParams.params.department.name;
+              }
+              if (newNavigationParams.params.patient) {
+                if (newNavigationParams.params.patient.id) contextInfo.patientId = newNavigationParams.params.patient.id;
+                if (newNavigationParams.params.patient.name) contextInfo.patientName = newNavigationParams.params.patient.name;
+                if (newNavigationParams.params.patient.bed) contextInfo.patientBed = newNavigationParams.params.patient.bed;
+                if (newNavigationParams.params.patient.sex) contextInfo.patientSex = newNavigationParams.params.patient.sex;
+                if (newNavigationParams.params.patient.age) contextInfo.patientAge = newNavigationParams.params.patient.age;
+              }
+
+              window.parent.mainLayout.setContextInfo(contextInfo);
+              console.log('已通知主布局更新上下文信息');
+            }
+          }
+        }
+      });
+
+      console.log('webapp通信监听已启动');
+    }
 
     // 对外接口 - 供第三方系统调用
     window.ChatIntegration = {
@@ -561,7 +652,7 @@
 
     // 实现setContextInfo函数，供main-layout.html调用
     window.setContextInfo = function (contextInfo) {
-      console.log('Chat page received context info');
+
 
       if (contextInfo) {
         // 将上下文信息转换为导航参数格式
@@ -589,11 +680,15 @@
           timestamp: new Date().toISOString()
         };
 
+
+
         // 更新currentNavigationParams并重新加载iframe
         currentNavigationParams = navigationParams;
         const iframe = document.getElementById('webappFrame');
         if (iframe) {
-          iframe.src = buildWebappUrl();
+          const newUrl = buildWebappUrl();
+
+          iframe.src = newUrl;
         }
       }
     };

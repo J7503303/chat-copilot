@@ -84,8 +84,60 @@ const App = () => {
     const chat = useChat();
     const file = useFile();
 
-    // 检查医生聊天模式
-    const doctorMode = React.useMemo(() => checkDoctorChatMode(), []);
+    // 检查医生聊天模式 - 监听URL参数变化
+    const [doctorMode, setDoctorMode] = React.useState(() => checkDoctorChatMode());
+
+    // 通知父窗口URL参数变化（用于electron集成）
+    const notifyParentOfUrlChange = React.useCallback((newDoctorMode: any) => {
+        if (newDoctorMode.isDoctorMode && window.parent && window.parent !== window) {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const paramObj: any = {};
+                params.forEach((value, key) => {
+                    paramObj[key] = value;
+                });
+                
+                window.parent.postMessage({
+                    type: 'URL_CHANGED',
+                    data: {
+                        url: window.location.href,
+                        params: paramObj
+                    }
+                }, '*');
+            } catch (e) {
+                // 忽略跨域错误
+            }
+        }
+    }, []);
+
+    // 处理URL参数变化
+    const handleDoctorModeChange = React.useCallback((newDoctorMode: any) => {
+        if (JSON.stringify(newDoctorMode) !== JSON.stringify(doctorMode)) {
+            setDoctorMode(newDoctorMode);
+            notifyParentOfUrlChange(newDoctorMode);
+        }
+    }, [doctorMode, notifyParentOfUrlChange]);
+
+    // 监听URL参数变化
+    React.useEffect(() => {
+        const checkAndUpdate = () => {
+            const newDoctorMode = checkDoctorChatMode();
+            handleDoctorModeChange(newDoctorMode);
+        };
+
+        // 监听各种URL变化事件
+        window.addEventListener('popstate', checkAndUpdate);
+        window.addEventListener('hashchange', checkAndUpdate);
+        
+        // 定期检查URL参数变化（备选方案）
+        const intervalId = setInterval(checkAndUpdate, 1000);
+        
+        return () => {
+            window.removeEventListener('popstate', checkAndUpdate);
+            window.removeEventListener('hashchange', checkAndUpdate);
+            clearInterval(intervalId);
+        };
+    }, [handleDoctorModeChange]);
 
     const handleAppStateChange = useCallback((newState: AppState) => {
         setAppState(newState);

@@ -99,17 +99,15 @@
 
     // 开发模式加载
     function loadDevelopmentMode() {
-      // 在开发模式下，直接重定向到主应用
-      redirectToMainApp();
+      // 在开发模式下，加载医生聊天界面
+      loadDoctorChatApp();
     }
 
-    // 重定向到主应用
-    function redirectToMainApp() {
+    // 加载医生聊天界面（不重定向）
+    function loadDoctorChatApp() {
       hideLoading();
 
-      const params = new URLSearchParams();
-
-      // 确保必要的参数都存在 - 优先使用传入的参数
+      // 确保必要的参数都存在
       if (!window.DOCTOR_PARAMS.doctor_id || window.DOCTOR_PARAMS.doctor_id === '') {
         // 如果没有doctor_id，但有doctor_name，使用doctor_name作为ID
         if (window.DOCTOR_PARAMS.doctor_name && window.DOCTOR_PARAMS.doctor_name !== '') {
@@ -121,21 +119,75 @@
         }
       }
 
-      // 添加所有非空参数
+
+
+      // 构建主应用URL，但在iframe中加载
+      const params = new URLSearchParams();
       Object.entries(window.DOCTOR_PARAMS).forEach(([key, value]) => {
         if (value && value.toString().trim() !== '') {
           params.set(key, value.toString());
         }
       });
-
-      // 确保有mode参数
       params.set('mode', 'doctor');
 
-      const newUrl = `${window.location.origin}/?${params.toString()}`;
-      console.log('Redirecting to main app:', newUrl);
+      const appUrl = `${window.location.origin}/?${params.toString()}`;
 
-      // 立即重定向
-      window.location.href = newUrl;
+
+      // 创建iframe来加载主应用
+      const iframe = document.createElement('iframe');
+      iframe.src = appUrl;
+      iframe.style.width = '100%';
+      iframe.style.height = '100vh';
+      iframe.style.border = 'none';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+
+      const root = document.getElementById('root');
+      root.innerHTML = '';
+      root.appendChild(iframe);
+
+      // 监听iframe中的URL变化
+      iframe.onload = function () {
+
+
+        // 设置定期检查iframe URL变化
+        let lastUrl = '';
+        const checkUrlChange = () => {
+          try {
+            const currentUrl = iframe.contentWindow?.location?.href;
+            if (currentUrl && currentUrl !== lastUrl) {
+
+              lastUrl = currentUrl;
+
+              // 通知父窗口URL变化
+              if (window.parent && window.parent !== window) {
+                const url = new URL(currentUrl);
+                const params = new URLSearchParams(url.search);
+                const paramObj = {};
+                params.forEach((value, key) => {
+                  paramObj[key] = value;
+                });
+
+                window.parent.postMessage({
+                  type: 'URL_CHANGED',
+                  data: {
+                    url: currentUrl,
+                    params: paramObj
+                  }
+                }, '*');
+              }
+            }
+          } catch (e) {
+            // 跨域错误，忽略
+          }
+        };
+
+        // 初始检查
+        setTimeout(checkUrlChange, 1000);
+
+        // 定期检查
+        setInterval(checkUrlChange, 2000);
+      };
     }
 
     // 页面加载完成后立即重定向

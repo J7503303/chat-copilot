@@ -460,34 +460,121 @@ const DoctorChatApp: React.FC = () => {
         void setupUserInfo();
     }, [instance, dispatch]);
 
+    // 获取医生参数的函数 - 移到组件顶层便于复用
+    const getDoctorParams = useCallback(() => {
+        // 检查是否有全局参数（electron模式）
+        if ((window as any).DOCTOR_PARAMS) {
+            const params = (window as any).DOCTOR_PARAMS;
+            return {
+                doctorId: params.doctor_id || params.userId || '',
+                doctorName: params.doctor_name || params.userName || '',
+                deptName: params.dept_name || '',
+                patientName: params.patient_name || ''
+            };
+        }
+        
+        // 从URL参数获取医生信息
+        const params = new URLSearchParams(window.location.search);
+        return {
+            doctorId: params.get('doctor_id') ?? params.get('userId'),
+            doctorName: params.get('doctor_name') ?? params.get('userName'),
+            deptName: params.get('dept_name'),
+            patientName: params.get('patient_name')
+        };
+    }, []);
+
+    // 通知父窗口URL参数变化（用于electron集成）
+    const notifyParentOfUrlChange = useCallback(() => {
+        if (window.parent && window.parent !== window) {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const paramObj: any = {};
+                params.forEach((value, key) => {
+                    paramObj[key] = value;
+                });
+                
+                window.parent.postMessage({
+                    type: 'URL_CHANGED',
+                    data: {
+                        url: window.location.href,
+                        params: paramObj
+                    }
+                }, '*');
+            } catch (e) {
+                // 忽略跨域错误
+            }
+        }
+    }, []);
+
+    // 重新初始化医生信息
+    const reinitializeDoctorInfo = useCallback((newParams: any) => {
+        if (newParams.doctorId) {
+            const userId = newParams.doctorId;
+            const userName = newParams.doctorName ?? `医生${newParams.doctorId}`;
+            
+            if (!AuthHelper.isAuthAAD()) {
+                dispatch(setActiveUserInfo({
+                    id: userId,
+                    email: `${userId}@medical.local`,
+                    username: userName,
+                }));
+            }
+            
+            const info: DoctorInfo = {
+                id: newParams.doctorId,
+                name: userName,
+                dept: newParams.deptName ?? undefined,
+                patient: newParams.patientName ?? undefined,
+            };
+            
+            // 清空当前状态并重新初始化
+            setMessages([]);
+            setChatSession(null);
+            setError(null);
+            setDoctorInfo(info);
+            
+            // 重新加载聊天历史和初始化会话
+            loadChatHistory(newParams.doctorId);
+            void initializeChatSession(info);
+        } else {
+            setError('缺少必需的医生ID参数 (doctor_id)');
+        }
+    }, [dispatch]);
+
+    // 监听URL参数变化
+    const [currentParams, setCurrentParams] = useState(() => getDoctorParams());
+    
+    useEffect(() => {
+        const checkParamsChange = () => {
+            const newParams = getDoctorParams();
+            const hasChanged = JSON.stringify(newParams) !== JSON.stringify(currentParams);
+            
+            if (hasChanged && isAuthReady) {
+                setCurrentParams(newParams);
+                notifyParentOfUrlChange();
+                reinitializeDoctorInfo(newParams);
+            }
+        };
+
+        // 监听各种URL变化事件
+        window.addEventListener('popstate', checkParamsChange);
+        window.addEventListener('hashchange', checkParamsChange);
+        
+        // 定期检查参数变化（备选方案）
+        const intervalId = setInterval(checkParamsChange, 1000);
+        
+        return () => {
+            window.removeEventListener('popstate', checkParamsChange);
+            window.removeEventListener('hashchange', checkParamsChange);
+            clearInterval(intervalId);
+        };
+    }, [currentParams, getDoctorParams, isAuthReady, notifyParentOfUrlChange, reinitializeDoctorInfo]);
+
     useEffect(() => {
         // 只有在身份验证准备就绪后才初始化医生信息和聊天会话
         if (!isAuthReady) return;
 
-        // 优先从window.DOCTOR_PARAMS获取参数（用于electron集成），然后从URL参数获取
-        const getDoctorParams = () => {
-            // 检查是否有全局参数（electron模式）
-            if ((window as any).DOCTOR_PARAMS) {
-                const params = (window as any).DOCTOR_PARAMS;
-                return {
-                    doctorId: params.doctor_id || params.userId || '',
-                    doctorName: params.doctor_name || params.userName || '',
-                    deptName: params.dept_name || '',
-                    patientName: params.patient_name || ''
-                };
-            }
-            
-            // 从URL参数获取医生信息
-            const params = new URLSearchParams(window.location.search);
-            return {
-                doctorId: params.get('doctor_id') ?? params.get('userId'),
-                doctorName: params.get('doctor_name') ?? params.get('userName'),
-                deptName: params.get('dept_name'),
-                patientName: params.get('patient_name')
-            };
-        };
-
-        const { doctorId, doctorName, deptName, patientName } = getDoctorParams();
+        const { doctorId, doctorName, deptName, patientName } = currentParams;
 
         if (!doctorId) {
             setError('缺少必需的医生ID参数 (doctor_id)');
@@ -503,13 +590,15 @@ const DoctorChatApp: React.FC = () => {
 
         setDoctorInfo(info);
         void initializeChatSession(info);
-    }, [isAuthReady]);
+
+        // 初始化时也通知父窗口当前参数
+        notifyParentOfUrlChange();
+    }, [isAuthReady, currentParams, notifyParentOfUrlChange]);
 
     // 监听来自父窗口的参数更新（用于electron集成）
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             if (event.data && event.data.type === 'CONTEXT_UPDATE') {
-                console.log('Context update received, reinitializing doctor info');
                 
                 // 更新全局参数
                 if (event.data.data && (window as any).DOCTOR_PARAMS) {
@@ -537,15 +626,12 @@ const DoctorChatApp: React.FC = () => {
                     const newDoctorId = params.doctorId;
                     
                     if (currentDoctorId !== newDoctorId) {
-                        console.log('🔄 医生ID已改变，从', currentDoctorId, '到', newDoctorId);
-                        
                         // 更新用户信息
                         dispatch(setActiveUserInfo({
                             id: newDoctorId,
                             email: `${newDoctorId}@medical.local`,
                             username: params.doctorName ?? `医生${newDoctorId}`,
                         }));
-                        console.log('Updated user info for new doctor ID');
                     }
                     
                     const info: DoctorInfo = {
@@ -555,7 +641,6 @@ const DoctorChatApp: React.FC = () => {
                         patient: params.patientName ?? undefined,
                     };
                     
-                    console.log('Updating doctor info');
                     setDoctorInfo(info);
                     void initializeChatSession(info);
                 }
@@ -810,16 +895,16 @@ const DoctorChatApp: React.FC = () => {
             if (!err?.toString().includes('SignalR')) {
                 try {
                     const offlineResponse = await generateSmartResponse(messageContent);
-                    const botMessage: Message = {
+            const botMessage: Message = {
                         id: `bot-offline-${Date.now()}`,
                         content: offlineResponse,
-                        isBot: true,
-                        timestamp: Date.now(),
-                        type: ChatMessageType.Message,
-                        authorRole: AuthorRoles.Bot,
-                    };
-                    
-                    setMessages(prev => [...prev, botMessage]);
+                isBot: true,
+                timestamp: Date.now(),
+                type: ChatMessageType.Message,
+                authorRole: AuthorRoles.Bot,
+            };
+            
+            setMessages(prev => [...prev, botMessage]);
                     setError(null); // 清除错误，因为我们提供了离线回复
                 } catch (offlineErr) {
                     console.error('❌ 离线回复也失败了:', offlineErr);
