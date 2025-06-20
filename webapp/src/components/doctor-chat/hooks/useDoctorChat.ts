@@ -14,7 +14,7 @@ import * as signalR from '@microsoft/signalr';
 import { useCallback, useEffect, useState } from 'react';
 
 import { AuthHelper } from '../../../libs/auth/AuthHelper';
-import { AuthorRoles, ChatMessageType } from '../../../libs/models/ChatMessage';
+import { AuthorRoles, ChatMessageType, IChatMessage } from '../../../libs/models/ChatMessage';
 import { IChatSession, ICreateChatSessionResponse } from '../../../libs/models/ChatSession';
 import { IAsk } from '../../../libs/semantic-kernel/model/Ask';
 import { BackendServiceUrl } from '../../../libs/services/BaseService';
@@ -24,17 +24,16 @@ import { useAppDispatch, useAppSelector } from '../../../redux/app/hooks';
 import { RootState } from '../../../redux/app/store';
 import { setActiveUserInfo, setAuthConfig } from '../../../redux/features/app/appSlice';
 
+import debug from 'debug';
 import { ChatSessionData, DoctorChatHistoryData, DoctorInfo, Message } from '../types';
 
-
-
 // 日志管理工具
-const isDevelopment = process.env.NODE_ENV === 'development';
+const debugLogger = debug('doctor-chat');
 const logger = {
-    debug: isDevelopment ? console.log : () => {},
-    info: console.log,
-    warn: console.warn,
-    error: console.error,
+    debug: debugLogger,
+    info: debugLogger,
+    warn: debugLogger,
+    error: debugLogger,
 };
 
 export const useDoctorChat = () => {
@@ -53,7 +52,24 @@ export const useDoctorChat = () => {
     const [chatService] = useState(() => new ChatService());
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
-    const [_hubConnection, _setHubConnection] = useState<signalR.HubConnection | null>(null);
+    const [hubConnection, setHubConnection] = useState<signalR.HubConnection | null>(null);
+    const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+    const [isStreamingMode, setIsStreamingMode] = useState(false); // 标记是否处于流式模式
+    const [contentStableTimer, setContentStableTimer] = useState<NodeJS.Timeout | null>(null); // 内容稳定检测定时器
+
+    // 完成流式输出的辅助函数
+    const completeStreaming = useCallback((reason: string) => {
+        logger.debug(`Streaming completed: ${reason}`);
+        setStreamingMessageId(null);
+        setIsLoading(false);
+        setIsStreamingMode(false);
+        
+        // 清理内容稳定检测定时器
+        if (contentStableTimer) {
+            clearTimeout(contentStableTimer);
+            setContentStableTimer(null);
+        }
+    }, [contentStableTimer]);
 
     // 生成GUID
     const generateGUID = useCallback(() => {
@@ -360,10 +376,18 @@ export const useDoctorChat = () => {
         setError(null);
         setInputValue('');
         setIsLoading(false);
+        setStreamingMessageId(null);
+        setIsStreamingMode(false);
+        
+        // 清理内容稳定检测定时器
+        if (contentStableTimer) {
+            clearTimeout(contentStableTimer);
+            setContentStableTimer(null);
+        }
         
         logger.info('Starting new chat session');
         void initializeChatSession(doctorInfo);
-    }, [doctorInfo, messages, saveChatSessions, generateGUID, initializeChatSession]);
+    }, [doctorInfo, messages, saveChatSessions, generateGUID, initializeChatSession, contentStableTimer]);
 
     // 调用真实的ChatAPI
     const callChatAPI = useCallback(async (message: string, session: IChatSession): Promise<string> => {
@@ -425,10 +449,13 @@ export const useDoctorChat = () => {
                 });
             }
 
-            logger.info('Sending API request');
+            logger.info('Sending API request with ask:', ask);
+            logger.info('Access token length:', accessToken.length);
+            logger.info('Chat session ID:', session.id);
+            
             const apiResult = await chatService.getBotResponseAsync(ask, accessToken);
             
-            logger.debug('Raw API response:', apiResult);
+            logger.info('Raw API response received:', apiResult);
             
             // 处理后端实际返回的格式 {Value: string, Variables: Array}
             if (apiResult && (apiResult as any).value) {
@@ -487,6 +514,8 @@ export const useDoctorChat = () => {
             
         } catch (err) {
             logger.error('❌ API调用失败:', err);
+            logger.error('Session ID:', session.id);
+            logger.error('Message was:', message);
             throw err;
         }
     }, [activeUserInfo, instance, inProgress, chatService, doctorInfo]);
@@ -499,7 +528,182 @@ export const useDoctorChat = () => {
         return `⚠️ **系统提示**\n\n${doctorName}，您好！\n\nAI助手当前处于离线状态。${patientInfo ? `\n\n${patientInfo}的咨询暂时无法处理。` : ''}\n\n**可能的原因：**\n• 网络连接中断\n• 后端服务暂时不可用\n• 系统正在维护\n\n**建议操作：**\n• 检查网络连接\n• 稍后重试发送消息\n• 如问题持续，请联系技术支持\n\n感谢您的理解！`;
     }, [doctorInfo]);
 
-    // 发送消息
+    // SignalR连接管理 - 恢复流式输出支持
+    const setupSignalRConnection = useCallback(async () => {
+        if (!chatSession || !activeUserInfo || hubConnection) {
+            return;
+        }
+
+        try {
+            logger.info('Setting up SignalR connection...');
+            
+            const connectionHubUrl = new URL('/messageRelayHub', BackendServiceUrl);
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl(connectionHubUrl.toString(), {
+                    skipNegotiation: true,
+                    transport: signalR.HttpTransportType.WebSockets,
+                })
+                .withAutomaticReconnect({
+                    nextRetryDelayInMilliseconds: retryContext => {
+                        if (retryContext.previousRetryCount >= 3) {
+                            logger.warn('SignalR max retries reached');
+                            return null;
+                        }
+                        return Math.min(2000 * Math.pow(2, retryContext.previousRetryCount), 10000);
+                    }
+                })
+                .configureLogging(signalR.LogLevel.Warning)
+                .build();
+
+            // 连接事件处理
+            connection.onclose((error) => {
+                logger.info('SignalR connection closed:', error?.message || 'Normal closure');
+                setHubConnection(null);
+            });
+
+            connection.onreconnecting(() => {
+                logger.info('SignalR reconnecting...');
+            });
+
+            connection.onreconnected(() => {
+                logger.info('SignalR reconnected');
+                if (chatSession?.id) {
+                    void connection.invoke('AddClientToGroupAsync', chatSession.id);
+                }
+            });
+
+            // 设置机器人响应状态监听器 - 这是流式输出的关键
+            connection.on('ReceiveBotResponseStatus', (chatId: string, status: string) => {
+                logger.debug('SignalR ReceiveBotResponseStatus:', { chatId, status });
+                // 这个事件告诉我们机器人开始响应，但我们已经有占位符了，所以不需要处理
+            });
+
+            // 设置消息监听器 - 接收完整的机器人消息
+            connection.on('ReceiveMessage', (_chatId: string, _senderId: string, message: IChatMessage) => {
+                logger.info('SignalR ReceiveMessage:', message);
+                
+                // 只有在流式模式下且是机器人消息才处理
+                if (!isStreamingMode || message.authorRole !== AuthorRoles.Bot) {
+                    return;
+                }
+                
+                // 如果有占位符消息，更新它；否则创建新消息
+                if (streamingMessageId) {
+                    logger.debug('Updating placeholder with ReceiveMessage content');
+                    setMessages(prev => 
+                        prev.map(msg => 
+                            msg.id === streamingMessageId 
+                                ? { 
+                                    ...msg, 
+                                    content: message.content || '',
+                                    id: message.id || streamingMessageId // 使用服务器返回的ID
+                                }
+                                : msg
+                        )
+                    );
+                    // 如果消息有ID，更新流式消息ID以便后续ReceiveMessageUpdate使用
+                    if (message.id) {
+                        setStreamingMessageId(message.id);
+                    }
+                } else {
+                    // 创建新的机器人消息
+                    const newMessage: Message = {
+                        id: message.id ?? `bot-${Date.now()}`,
+                        content: message.content || '',
+                        isBot: true,
+                        timestamp: message.timestamp ?? Date.now(),
+                        type: message.type,
+                        authorRole: message.authorRole,
+                    };
+                    setMessages(prev => [...prev, newMessage]);
+                    // 设置流式消息ID，等待后续的ReceiveMessageUpdate
+                    setStreamingMessageId(newMessage.id);
+                }
+                // 不在这里结束流式模式，等待ReceiveMessageUpdate的tokenUsage信号
+            });
+
+            // 设置消息更新监听器 - 流式输出的关键，逐步更新消息内容
+            connection.on('ReceiveMessageUpdate', (message: IChatMessage) => {
+                logger.debug('SignalR ReceiveMessageUpdate:', message);
+                
+                // 只有在流式模式下才处理更新
+                if (!isStreamingMode) {
+                    return;
+                }
+                
+                // 根据消息ID更新对应的消息内容
+                if (message.id && message.content) {
+                    logger.debug('Updating message content via ReceiveMessageUpdate');
+                    setMessages(prev => 
+                        prev.map(msg => 
+                            msg.id === message.id 
+                                ? { ...msg, content: message.content || '' }
+                                : msg
+                        )
+                    );
+                } else if (streamingMessageId && message.content) {
+                    // 备用：如果没有消息ID，使用当前流式消息ID
+                    logger.debug('Updating placeholder message with streaming content');
+                    setMessages(prev => 
+                        prev.map(msg => 
+                            msg.id === streamingMessageId 
+                                ? { ...msg, content: message.content || '' }
+                                : msg
+                        )
+                    );
+                }
+
+                // 主要完成检测：通过tokenUsage判断
+                if (message.tokenUsage) {
+                    completeStreaming('tokenUsage detected');
+                    return;
+                }
+
+                // 备用完成检测：内容稳定性检测
+                if (message.content && message.content.length > 0) {
+                    // 清除之前的稳定检测定时器
+                    if (contentStableTimer) {
+                        clearTimeout(contentStableTimer);
+                    }
+                    
+                    // 设置新的稳定检测定时器
+                    const newTimer = setTimeout(() => {
+                        if (isStreamingMode && streamingMessageId) {
+                            completeStreaming('content stable for 3 seconds');
+                        }
+                    }, 3000); // 3秒内容无变化则认为完成
+                    
+                    setContentStableTimer(newTimer);
+                }
+            });
+
+            // 启动连接
+            await connection.start();
+            logger.info('SignalR connection established');
+            
+            // 加入聊天组
+            await connection.invoke('AddClientToGroupAsync', chatSession.id);
+            logger.info('Joined SignalR chat group:', chatSession.id);
+            
+            setHubConnection(connection);
+
+        } catch (error) {
+            logger.error('SignalR connection failed:', error);
+        }
+    }, [chatSession, activeUserInfo, hubConnection, streamingMessageId, isStreamingMode]);
+
+    // 清理SignalR连接
+    const cleanupSignalRConnection = useCallback(() => {
+        if (hubConnection) {
+            logger.info('Cleaning up SignalR connection');
+            hubConnection.stop().catch(err => 
+                logger.warn('Error stopping SignalR connection:', err)
+            );
+            setHubConnection(null);
+        }
+    }, [hubConnection]);
+
+    // 改进的sendMessage方法 - 优先尝试流式，失败时回退到传统API
     const sendMessage = useCallback(async () => {
         if (!inputValue.trim() || isLoading || !doctorInfo || !chatSession) return;
 
@@ -517,25 +721,96 @@ export const useDoctorChat = () => {
         setInputValue('');
         setIsLoading(true);
         setError(null);
+        setIsOffline(false);
 
         try {
-            // 首先尝试调用真实API
-            const response = await callChatAPI(messageContent, chatSession);
-            
-            const botMessage: Message = {
-                id: `bot-${Date.now()}`,
-                content: response,
-                isBot: true,
-                timestamp: Date.now(),
-                type: ChatMessageType.Message,
-                authorRole: AuthorRoles.Bot,
-            };
-            
-            setMessages(prev => [...prev, botMessage]);
-            logger.info('Message sent successfully via API');
+            // 优先尝试流式输出
+            if (hubConnection && hubConnection.state === signalR.HubConnectionState.Connected) {
+                logger.info('Attempting streaming via SignalR...');
+                setIsStreamingMode(true);
+                
+                try {
+                    // 通过SignalR发送消息，等待流式响应
+                    // SignalR的ReceiveMessage会创建初始消息，ReceiveMessageUpdate会更新内容
+                    await callChatAPI(messageContent, chatSession);
+                    
+                    // 设置超时回退机制 - 作为最后的安全网
+                    setTimeout(() => {
+                        if (isStreamingMode && isLoading) {
+                            logger.warn('SignalR streaming timeout (30s), falling back to traditional API');
+                            setIsStreamingMode(false);
+                            
+                            // 重新调用API获取响应
+                            callChatAPI(messageContent, chatSession).then(response => {
+                                // 创建传统API响应消息
+                                const botMessage: Message = {
+                                    id: `bot-${Date.now()}`,
+                                    content: response,
+                                    isBot: true,
+                                    timestamp: Date.now(),
+                                    type: ChatMessageType.Message,
+                                    authorRole: AuthorRoles.Bot,
+                                };
+                                setMessages(prev => [...prev, botMessage]);
+                                setStreamingMessageId(null);
+                                setIsLoading(false);
+                            }).catch(err => {
+                                logger.error('Fallback API call failed:', err);
+                                setStreamingMessageId(null);
+                                setIsLoading(false);
+                            });
+                        }
+                    }, 30000); // 给流式响应30秒时间 - 作为最后的安全网
+                    
+                } catch (signalRError) {
+                    logger.warn('SignalR streaming failed, falling back to traditional API:', signalRError);
+                    setIsStreamingMode(false);
+                    
+                    // 回退到传统API
+                    const response = await callChatAPI(messageContent, chatSession);
+                    const botMessage: Message = {
+                        id: `bot-${Date.now()}`,
+                        content: response,
+                        isBot: true,
+                        timestamp: Date.now(),
+                        type: ChatMessageType.Message,
+                        authorRole: AuthorRoles.Bot,
+                    };
+                    setMessages(prev => [...prev, botMessage]);
+                    setStreamingMessageId(null);
+                    setIsLoading(false);
+                }
+            } else {
+                // 直接使用传统API
+                logger.info('No SignalR connection, using traditional API...');
+                const response = await callChatAPI(messageContent, chatSession);
+                
+                const botMessage: Message = {
+                    id: `bot-${Date.now()}`,
+                    content: response,
+                    isBot: true,
+                    timestamp: Date.now(),
+                    type: ChatMessageType.Message,
+                    authorRole: AuthorRoles.Bot,
+                };
+                setMessages(prev => [...prev, botMessage]);
+                setStreamingMessageId(null);
+                setIsLoading(false);
+            }
             
         } catch (err) {
-            logger.error('发送消息失败，显示离线提示:', err);
+            logger.error('发送消息失败:', err);
+            
+            // 移除思考中的占位符消息
+            setMessages(prev => prev.filter(msg => !msg.isBot || msg.content !== ''));
+            setStreamingMessageId(null);
+            setIsStreamingMode(false);
+            
+            // 清理内容稳定检测定时器
+            if (contentStableTimer) {
+                clearTimeout(contentStableTimer);
+                setContentStableTimer(null);
+            }
             
             // 设置离线状态
             setIsOffline(true);
@@ -552,11 +827,9 @@ export const useDoctorChat = () => {
             };
             
             setMessages(prev => [...prev, botMessage]);
-            logger.info('Offline notification shown to user');
-        } finally {
             setIsLoading(false);
         }
-    }, [inputValue, isLoading, doctorInfo, chatSession, callChatAPI, showOfflineNotification]);
+    }, [inputValue, isLoading, doctorInfo, chatSession, callChatAPI, showOfflineNotification, hubConnection, isStreamingMode]);
 
     // 自动保存聊天历史 - 使用防抖机制减少频繁写入
     useEffect(() => {
@@ -580,6 +853,17 @@ export const useDoctorChat = () => {
         void setupUserInfo();
     }, [setupUserInfo]);
 
+    // 设置SignalR连接的Effect - 恢复流式输出
+    useEffect(() => {
+        if (isAuthReady && chatSession && activeUserInfo && !hubConnection) {
+            void setupSignalRConnection();
+        }
+        
+        return () => {
+            cleanupSignalRConnection();
+        };
+    }, [isAuthReady, chatSession, activeUserInfo, setupSignalRConnection, cleanupSignalRConnection, hubConnection]);
+
     return {
         // 状态
         doctorInfo,
@@ -602,7 +886,6 @@ export const useDoctorChat = () => {
         setInputValue,
         setIsLoading,
         setError,
-        setIsAuthReady,
         createNewChat,
         sendMessage,
         saveChatSessions,

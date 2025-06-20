@@ -3,7 +3,7 @@
 
 import { Button, Input, makeStyles } from '@fluentui/react-components';
 import { Send24Regular } from '@fluentui/react-icons';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const useClasses = makeStyles({
     inputArea: {
@@ -39,6 +39,7 @@ export const DoctorChatInput: React.FC<DoctorChatInputProps> = ({
     isOffline = false,
 }) => {
     const classes = useClasses();
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const handleKeyPress = (event: React.KeyboardEvent) => {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -53,9 +54,27 @@ export const DoctorChatInput: React.FC<DoctorChatInputProps> = ({
 
     const isDisabled = disabled || isOffline;
 
+    // 当输入框从禁用状态恢复时，自动获得焦点
+    useEffect(() => {
+        if (!isDisabled && inputRef.current) {
+            // 使用setTimeout确保DOM更新完成后再获得焦点
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+        }
+    }, [isDisabled]);
+
+    // 组件初始化时获得焦点
+    useEffect(() => {
+        if (!isDisabled && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isDisabled]);
+
     return (
         <div className={classes.inputArea}>
             <Input
+                ref={inputRef}
                 className={classes.input}
                 placeholder={actualPlaceholder}
                 value={value}

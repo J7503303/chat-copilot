@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
-import { Spinner, Text, makeStyles } from '@fluentui/react-components';
+import { Text, makeStyles } from '@fluentui/react-components';
 import React from 'react';
 import { AuthorRoles, ChatMessageType } from '../../libs/models/ChatMessage';
 import { DoctorChatMessage } from './DoctorChatMessage';
@@ -13,13 +13,6 @@ const useClasses = makeStyles({
         flex: 1,
         gap: '8px',
         overflow: 'auto',
-        padding: '16px',
-    },
-    loading: {
-        alignItems: 'center',
-        display: 'flex',
-        gap: '8px',
-        justifyContent: 'center',
         padding: '16px',
     },
     error: {
@@ -41,7 +34,6 @@ interface Message {
 interface DoctorChatHistoryProps {
     messages: Message[];
     doctorName?: string;
-    isLoading?: boolean;
     error?: string | null;
     messagesEndRef?: React.RefObject<HTMLDivElement>;
 }
@@ -49,7 +41,6 @@ interface DoctorChatHistoryProps {
 export const DoctorChatHistory: React.FC<DoctorChatHistoryProps> = ({
     messages,
     doctorName,
-    isLoading = false,
     error = null,
     messagesEndRef,
 }) => {
@@ -65,12 +56,7 @@ export const DoctorChatHistory: React.FC<DoctorChatHistoryProps> = ({
                 />
             ))}
             
-            {isLoading && (
-                <div className={classes.loading}>
-                    <Spinner size="tiny" />
-                    <Text size={200}>AI正在分析中...</Text>
-                </div>
-            )}
+
             
             {error && (
                 <div className={classes.error}>

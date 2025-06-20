@@ -59,7 +59,6 @@ export const DoctorChatRoom: React.FC<DoctorChatRoomProps> = ({
             <DoctorChatHistory
                 messages={messages}
                 doctorName={doctorName}
-                isLoading={isLoading}
                 error={error}
                 messagesEndRef={messagesEndRef}
             />
