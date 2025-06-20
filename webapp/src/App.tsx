@@ -80,7 +80,7 @@ export enum AppState {
 const checkDoctorChatMode = (): DoctorModeState => {
     const params = new URLSearchParams(window.location.search);
     const doctorId = params.get('doctor_id') ?? params.get('userId');
-    const isDoctor = doctorId !== null && doctorId.trim() !== '';
+    const isDoctor = Boolean(doctorId?.trim());
     
     return {
         isDoctorMode: isDoctor,

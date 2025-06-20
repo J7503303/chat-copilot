@@ -141,6 +141,17 @@ interface ChatHistoryData {
     timestamp: number;
 }
 
+// 日志管理工具 - 在生产环境中禁用非关键日志
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// 日志管理工具 - 生产环境优化
+const logger = {
+    debug: isDevelopment ? console.log : () => {},
+    info: console.log, // 保留重要信息日志
+    warn: console.warn, // 保留警告日志
+    error: console.error, // 保留错误日志
+};
+
 const DoctorChatApp: React.FC = () => {
     const classes = useClasses();
     const { instance, inProgress } = useMsal();
@@ -163,18 +174,16 @@ const DoctorChatApp: React.FC = () => {
     // 本地存储键名
     const getStorageKey = (doctorId: string) => `doctor-chat-${doctorId}`;
 
-    // 建立SignalR连接
+    // 简化的SignalR连接管理 - 避免复杂状态导致的内存泄漏
     useEffect(() => {
         let connection: signalR.HubConnection | null = null;
-        let isConnecting = false;
+        let connectionPromise: Promise<void> | null = null;
         
         const setupSignalRConnection = async () => {
-            // 避免重复连接和并发连接
-            if (hubConnection || isConnecting || !chatSession || !activeUserInfo) {
+            // 严格检查：避免重复连接
+            if (hubConnection || connectionPromise || !chatSession || !activeUserInfo) {
                 return;
             }
-            
-            isConnecting = true;
             
             try {
                 const connectionHubUrl = new URL('/messageRelayHub', BackendServiceUrl);
@@ -185,184 +194,138 @@ const DoctorChatApp: React.FC = () => {
                     })
                     .withAutomaticReconnect({
                         nextRetryDelayInMilliseconds: retryContext => {
-                            // 更严格的重连控制
+                            // 限制重连次数，避免连接堆积
                             if (retryContext.previousRetryCount >= 3) {
-                                                            console.log('SignalR max retries reached, stopping reconnection');
-                            return null; // 停止重连
-                        }
-                        const delay = Math.min(2000 * Math.pow(2, retryContext.previousRetryCount), 10000);
-                        return delay;
+                                console.log('SignalR max retries reached, stopping reconnection');
+                                return null;
+                            }
+                            return Math.min(2000 * Math.pow(2, retryContext.previousRetryCount), 10000);
                         }
                     })
-                    .configureLogging(signalR.LogLevel.Error) // 只显示错误日志
+                    .configureLogging(signalR.LogLevel.Error)
                     .build();
 
-                // 设置连接事件处理
+                // 简化的连接事件处理
                 connection.onclose((error) => {
                     console.log('SignalR connection closed:', error?.message || 'Normal closure');
                     setHubConnection(null);
-                    isConnecting = false;
+                    connectionPromise = null;
                 });
 
-                connection.onreconnecting((_error) => {
+                connection.onreconnecting(() => {
                     console.log('SignalR reconnecting...');
                 });
 
-                connection.onreconnected((_connectionId) => {
+                connection.onreconnected(() => {
                     console.log('SignalR reconnected');
                     // 重连后重新加入聊天组
-                    if (chatSession) {
+                    if (chatSession?.id) {
                         void addToSignalRGroup(chatSession.id);
                     }
                 });
 
-                await connection.start();
-                console.log('SignalR connection established');
-                setHubConnection(connection);
-                isConnecting = false;
-
-                // 监听消息接收 - 完整的新消息
-                connection.on('ReceiveMessage', (_chatId: string, _senderId: string, message: SignalRMessage) => {
+                // 设置消息监听
+                connection.on('ReceiveMessage', (message: SignalRMessage) => {
                     console.log('SignalR message received');
-                    
-                    if (message.authorRole === AuthorRoles.Bot) {
+                    try {
                         const newMessage: Message = {
-                            id: message.id ?? `signalr-${Date.now()}`,
+                            id: message.id ?? `bot-${Date.now()}`,
                             content: message.content,
-                            isBot: true,
+                            isBot: message.authorRole === AuthorRoles.Bot,
                             timestamp: message.timestamp ?? Date.now(),
-                            type: message.type ?? ChatMessageType.Message,
+                            type: message.type,
                             authorRole: message.authorRole,
                         };
-                        
+
                         setMessages(prev => {
-                            // 检查是否已经存在相同ID的消息，避免重复
-                            const existingIndex = prev.findIndex(m => m.id === newMessage.id);
-                            if (existingIndex >= 0) {
-                                const updated = [...prev];
-                                updated[existingIndex] = newMessage;
-                                return updated;
+                            // 避免重复消息
+                            const exists = prev.some(msg => msg.id === newMessage.id);
+                            if (exists) {
+                                // 更新现有消息
+                                return prev.map(msg => msg.id === newMessage.id ? newMessage : msg);
                             }
                             return [...prev, newMessage];
                         });
-                        
-                        setIsLoading(false); // 收到完整消息后停止加载状态
-                    }
-                });
 
-                // 监听消息更新 - 流式输出的增量更新
-                connection.on('ReceiveMessageUpdate', (message: SignalRMessage) => {
-                    console.log('SignalR message updated');
-                    
-                    if (message.authorRole === AuthorRoles.Bot) {
-                        setMessages(prev => {
-                            const updatedMessages = [...prev];
-                            
-                            // 优先通过ID查找消息
-                            let targetIndex = -1;
-                            if (message.id) {
-                                targetIndex = updatedMessages.findIndex(m => m.id === message.id);
-                            }
-                            
-                            // 如果没有找到，查找最后一个Bot消息
-                            if (targetIndex === -1) {
-                                for (let i = updatedMessages.length - 1; i >= 0; i--) {
-                                    if (updatedMessages[i].isBot) {
-                                        targetIndex = i;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if (targetIndex >= 0) {
-                                updatedMessages[targetIndex] = {
-                                    ...updatedMessages[targetIndex],
-                                    content: message.content,
-                                    timestamp: message.timestamp || updatedMessages[targetIndex].timestamp,
-                                };
-                            } else {
-                                // 如果没有找到现有消息，创建新消息
-                                const newMessage: Message = {
-                                    id: message.id || `update-${Date.now()}`,
-                                    content: message.content,
-                                    isBot: true,
-                                    timestamp: message.timestamp || Date.now(),
-                                    type: message.type,
-                                    authorRole: message.authorRole
-                                };
-                                updatedMessages.push(newMessage);
-                            }
-                            
-                            return updatedMessages;
-                        });
-                    }
-                });
-
-                // 监听Bot响应状态更新
-                connection.on('ReceiveBotResponseStatus', (_chatId: string, status: string | null) => {
-                    try {
-                        console.log('Bot response status received');
-                        if (status && typeof status === 'string' && status.includes('Generating bot response')) {
-                            setIsLoading(true);
-                        }
+                        setIsLoading(false);
+                        logger.debug('SignalR message updated');
                     } catch (error) {
-                        console.error('ReceiveBotResponseStatus处理错误:', error, { status, statusType: typeof status });
+                        console.error('处理SignalR消息时出错:', error);
                     }
                 });
 
-                // 立即加入聊天组
-                void addToSignalRGroup(chatSession.id);
+                // 启动连接
+                connectionPromise = connection.start();
+                await connectionPromise;
+                
+                setHubConnection(connection);
+                                    logger.info('SignalR connection established');
+                
+                // 连接成功后加入聊天组
+                if (chatSession?.id) {
+                    await addToSignalRGroup(chatSession.id);
+                }
 
             } catch (err) {
                 console.warn('❌ SignalR连接失败:', err);
                 setHubConnection(null);
-                isConnecting = false;
+                connectionPromise = null;
             }
         };
 
-        // 只有在有聊天会话和用户信息时才建立连接
-        if (chatSession && activeUserInfo && !hubConnection && !isConnecting) {
+        // 只有在需要时才建立连接
+        if (chatSession && activeUserInfo && !hubConnection && !connectionPromise) {
             void setupSignalRConnection();
         }
 
+        // 确保清理资源
         return () => {
             if (connection && connection.state === signalR.HubConnectionState.Connected) {
                 console.log('Cleaning up SignalR connection');
                 void connection.stop();
             }
-            isConnecting = false;
+            connectionPromise = null;
         };
-    }, [chatSession, activeUserInfo]);
+    }, [chatSession, activeUserInfo]); // 简化依赖
 
     // 将聊天ID添加到SignalR组
     const addToSignalRGroup = useCallback(async (chatId: string) => {
         if (hubConnection && hubConnection.state === signalR.HubConnectionState.Connected && chatId) {
             try {
-                console.log('Adding chat to SignalR group');
+                logger.debug('Adding chat to SignalR group');
                 await hubConnection.invoke('AddClientToGroupAsync', chatId);
-                console.log('Successfully joined SignalR group');
+                logger.debug('Successfully joined SignalR group');
             } catch (err) {
                 console.warn('❌ 添加到SignalR组失败:', err);
             }
-        } else {
-            console.log('Skipping SignalR group join, connection unavailable');
-        }
+                    } else {
+                logger.debug('Skipping SignalR group join, connection unavailable');
+            }
     }, [hubConnection]);
 
-    // 自动保存聊天历史（当消息更新时）
+    // 优化的聊天历史保存 - 使用防抖机制减少频繁写入
     useEffect(() => {
-        if (doctorInfo && chatSession && messages.length > 0) {
-            const storageKey = getStorageKey(doctorInfo.id);
-            const chatData: ChatHistoryData = {
-                doctorInfo,
-                messages,
-                chatSession,
-                timestamp: Date.now(),
-            };
-            localStorage.setItem(storageKey, JSON.stringify(chatData));
-            console.log('Auto-saving chat history');
-        }
-    }, [messages, doctorInfo, chatSession]); // 当消息、医生信息或会话变化时自动保存
+        if (!doctorInfo || messages.length <= 1) return; // 排除只有欢迎消息的情况
+        
+        // 防抖保存，避免频繁写入localStorage
+        const saveTimeoutId = setTimeout(() => {
+            try {
+                const storageKey = getStorageKey(doctorInfo.id);
+                const chatData: ChatHistoryData = {
+                    doctorInfo,
+                    messages,
+                    chatSession,
+                    timestamp: Date.now(),
+                };
+                localStorage.setItem(storageKey, JSON.stringify(chatData));
+                logger.debug('Auto-saving chat history');
+            } catch (error) {
+                console.warn('保存聊天历史失败:', error);
+            }
+        }, 2000); // 2秒防抖
+
+        return () => clearTimeout(saveTimeoutId);
+    }, [messages, doctorInfo, chatSession]);
 
     // 设置用户信息（如果还没有设置）
     useEffect(() => {
@@ -556,17 +519,16 @@ const DoctorChatApp: React.FC = () => {
             }
         };
 
-        // 监听各种URL变化事件
+        // 只监听URL事件，移除定时器以避免冲突
         window.addEventListener('popstate', checkParamsChange);
         window.addEventListener('hashchange', checkParamsChange);
         
-        // 定期检查参数变化（备选方案）
-        const intervalId = setInterval(checkParamsChange, 1000);
+        // 初始检查一次
+        checkParamsChange();
         
         return () => {
             window.removeEventListener('popstate', checkParamsChange);
             window.removeEventListener('hashchange', checkParamsChange);
-            clearInterval(intervalId);
         };
     }, [currentParams, getDoctorParams, isAuthReady, notifyParentOfUrlChange, reinitializeDoctorInfo]);
 
@@ -950,6 +912,38 @@ const DoctorChatApp: React.FC = () => {
         }
     };
 
+    // 统一的错误处理函数
+    const handleAPIError = async (err: unknown, message: string): Promise<string> => {
+        console.error('❌ API调用失败，错误详情:', err);
+        
+        // 检查是否是会话不存在错误 (404)
+        if (err instanceof Error && (err.message.includes('404') || err.message.includes('Failed to find chat session'))) {
+            console.log('Chat session not found (404), clearing invalid session and switching to offline mode');
+            
+            // 清除无效的会话和历史记录
+            if (doctorInfo) {
+                const storageKey = getStorageKey(doctorInfo.id);
+                localStorage.removeItem(storageKey);
+                
+                // 添加提示消息
+                const warningMessage: Message = {
+                    id: `warning-${Date.now()}`,
+                    content: '⚠️ 检测到会话已过期，已清除无效数据。请点击"清除记录"按钮重新开始，或继续使用离线模式。',
+                    isBot: true,
+                    timestamp: Date.now(),
+                    type: ChatMessageType.Message,
+                    authorRole: AuthorRoles.Bot,
+                };
+                
+                setMessages(prev => [...prev, warningMessage]);
+            }
+        }
+        
+        // 统一切换到离线模式
+        console.log('Switching to offline mode');
+        return await generateSmartResponse(message);
+    };
+
     const callChatAPI = async (message: string, session: IChatSession): Promise<string> => {
         try {
             // 确保有活跃用户信息
@@ -1113,49 +1107,7 @@ const DoctorChatApp: React.FC = () => {
             throw new Error('API响应格式不正确');
             
         } catch (err) {
-            console.error('❌ API调用失败，错误详情:', err);
-            
-            // 检查是否是会话不存在错误 (404)
-            if (err instanceof Error && (err.message.includes('404') || err.message.includes('Failed to find chat session'))) {
-                console.log('Chat session not found (404), clearing invalid session and switching to offline mode');
-                
-                // 清除无效的会话和历史记录
-                if (doctorInfo) {
-                    const storageKey = getStorageKey(doctorInfo.id);
-                    localStorage.removeItem(storageKey);
-                    
-                    // 添加提示消息
-                    const warningMessage: Message = {
-                        id: `warning-${Date.now()}`,
-                        content: '⚠️ 检测到会话已过期，已清除无效数据。请点击"清除记录"按钮重新开始，或继续使用离线模式。',
-                        isBot: true,
-                        timestamp: Date.now(),
-                        type: ChatMessageType.Message,
-                        authorRole: AuthorRoles.Bot,
-                    };
-                    
-                    setMessages(prev => [...prev, warningMessage]);
-                }
-                
-                // 使用离线模式回复当前消息
-                return await generateSmartResponse(message);
-            }
-            
-            // 检查是否是身份验证错误
-            if (err instanceof Error && (err.message.includes('401') || err.message.includes('访问令牌'))) {
-                console.log('Authentication failed, switching to offline mode');
-                return await generateSmartResponse(message);
-            }
-            
-            // 检查是否是网络错误
-            if (err instanceof Error && (err.message.includes('NetworkError') || err.message.includes('fetch'))) {
-                console.log('Network failed, switching to offline mode');
-                return await generateSmartResponse(message);
-            }
-            
-            // 对于其他错误，也使用智能模拟回复
-            console.log('API unavailable, switching to offline mode');
-            return await generateSmartResponse(message);
+            return await handleAPIError(err, message);
         }
     };
 
