@@ -1,0 +1,183 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Semantic Kernel 插件开发规则
+
+## 核心插件架构
+### 主要插件
+- [webapi/Plugins/Chat/ChatPlugin.cs](mdc:webapi/Plugins/Chat/ChatPlugin.cs) - 核心聊天插件
+- [webapi/Plugins/Chat/KernelMemoryRetriever.cs](mdc:webapi/Plugins/Chat/KernelMemoryRetriever.cs) - 内存检索插件
+
+### 插件目录结构
+- [webapi/Plugins/Chat/](mdc:webapi/Plugins/Chat/) - 聊天相关插件
+- [webapi/Plugins/OpenApi/](mdc:webapi/Plugins/OpenApi/) - OpenAPI插件
+- [webapi/Plugins/Utils/](mdc:webapi/Plugins/Utils/) - 工具插件
+
+## ChatPlugin 核心功能
+### 主要方法
+- `ChatAsync()` - 聊天处理入口点，带有 `[KernelFunction]` 特性
+- `ExtractChatHistory()` - 提取聊天历史
+- `StreamResponseToClientAsync()` - 流式输出实现
+- `GetChatResponseAsync()` - 获取AI响应
+- `HandleBotResponseAsync()` - 处理Bot响应和Token统计
+
+### 插件依赖注入
+```csharp
+public ChatPlugin(
+    Kernel kernel,                              // SK内核
+    IKernelMemory memoryClient,                 // 内存服务
+    ChatMessageRepository chatMessageRepository, // 消息仓库
+    ChatSessionRepository chatSessionRepository, // 会话仓库
+    IHubContext<MessageRelayHub> messageRelayHubContext, // SignalR Hub
+    IOptions<PromptsOptions> promptOptions,     // 提示选项
+    ILogger logger,                             // 日志服务
+    AzureContentSafety? contentSafety = null)   // 内容安全
+```
+
+## Kernel Function 开发模式
+### 函数特性标记
+```csharp
+[KernelFunction, Description("Get chat response")]
+public async Task<KernelArguments> ChatAsync(
+    [Description("The new message")] string message,
+    [Description("Unique and persistent identifier for the user")] string userId,
+    [Description("Name of the user")] string userName,
+    [Description("Unique and persistent identifier for the chat")] string chatId,
+    [Description("Type of the message")] string messageType,
+    KernelArguments context,
+    CancellationToken cancellationToken = default)
+```
+
+### 参数规范
+- 使用 `[Description]` 特性描述参数用途
+- 支持 `CancellationToken` 取消操作
+- 返回 `KernelArguments` 保持上下文
+
+## 内存管理
+### KernelMemoryRetriever
+处理语义记忆检索和管理:
+- 工作记忆 (WorkingMemory)
+- 长期记忆 (LongTermMemory)  
+- 文档记忆 (DocumentMemory)
+
+### 内存配置
+在 [webapi/appsettings.json](mdc:webapi/appsettings.json) 中配置:
+```json
+"Prompts": {
+    "WorkingMemoryName": "WorkingMemory",
+    "LongTermMemoryName": "LongTermMemory", 
+    "DocumentMemoryName": "DocumentMemory"
+}
+```
+
+## 提示词工程
+### 提示配置
+```json
+"Prompts": {
+    "SystemDescription": "系统描述",
+    "SystemResponse": "系统响应模板",
+    "InitialBotMessage": "初始欢迎消息",
+    "SystemIntent": "意图理解提示",
+    "SystemCognitive": "认知处理提示"
+}
+```
+
+### 动态提示生成
+- `RenderSystemInstructionsAsync()` - 渲染系统指令
+- `GetUserIntentAsync()` - 获取用户意图
+- `GetAudienceAsync()` - 获取目标受众
+
+## OpenAPI 插件集成
+### 内置OpenAPI插件
+- **GitHub插件**: 集成GitHub API功能
+- **Jira插件**: 集成Jira API功能  
+- **自定义插件**: 支持动态加载
+
+### 插件配置
+在 [webapi/appsettings.json](mdc:webapi/appsettings.json) 中:
+```json
+"Plugins": [
+    {
+        "Name": "GitHub Plugin",
+        "ManifestDomain": "https://github.com"
+    }
+]
+```
+
+### 插件认证
+通过HTTP头部传递认证信息:
+```csharp
+// 插件认证头格式: x-sk-copilot-{plugin}-auth
+var authHeaders = GetPluginAuthHeaders(this.HttpContext.Request.Headers);
+```
+
+## Token 管理
+### 智能预算分配
+```csharp
+private int GetMaxRequestTokenBudget()
+{
+    const int ExtraOpenAiMessageTokens = 20;
+    return this._promptOptions.CompletionTokenLimit    // 模型总限制
+           - ExtraOpenAiMessageTokens                  // OpenAI开销
+           - this._promptOptions.ResponseTokenLimit    // 响应预留
+           - this._promptOptions.FunctionCallingTokenLimit; // 函数调用预留
+}
+```
+
+### Token统计
+- 使用 `TokenUtils` 类进行Token计算
+- 支持多种语义函数的Token统计
+- 实时统计响应Token使用量
+
+## 错误处理和日志
+### 结构化异常处理
+```csharp
+try
+{
+    // 插件调用逻辑
+    this._telemetryService.TrackPluginFunction(ChatPluginName, ChatFunctionName, true);
+}
+catch (Exception ex)
+{
+    this._telemetryService.TrackPluginFunction(ChatPluginName, ChatFunctionName, false);
+    throw;
+}
+```
+
+### 遥测集成
+- Application Insights集成
+- 自定义事件追踪
+- 性能指标监控
+
+## 插件开发最佳实践
+1. **异步编程**: 全面使用async/await模式
+2. **取消令牌**: 支持操作取消和超时
+3. **依赖注入**: 通过DI获取服务依赖
+4. **错误边界**: 完善的异常处理机制
+5. **日志记录**: 详细的操作日志
+6. **性能优化**: Token预算管理和资源释放
+7. **测试覆盖**: 单元测试和集成测试
+
+## 扩展插件开发
+### 自定义插件示例
+```csharp
+public class CustomPlugin
+{
+    [KernelFunction, Description("Custom function description")]
+    public async Task<string> CustomFunctionAsync(
+        [Description("Input parameter")] string input,
+        CancellationToken cancellationToken = default)
+    {
+        // 自定义插件逻辑
+        return "Custom response";
+    }
+}
+```
+
+### 插件注册
+在 `Program.cs` 或服务配置中注册插件:
+```csharp
+builder.Services.AddSingleton<CustomPlugin>();
+```

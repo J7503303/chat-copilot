@@ -1,0 +1,146 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# SignalR 和流式输出开发规则
+
+## SignalR Hub (后端)
+### 核心Hub
+- [webapi/Hubs/MessageRelayHub.cs](mdc:webapi/Hubs/MessageRelayHub.cs) - SignalR消息中继Hub
+  - `AddClientToGroupAsync()` - 将客户端加入聊天组
+  - `SendMessageAsync()` - 发送消息到组内其他客户端
+  - `SendUserTypingStateAsync()` - 发送用户输入状态
+
+### Hub事件方法
+标准SignalR事件名称（必须与前端保持一致）:
+```csharp
+// 这些方法名必须与前端SignalRCallbackMethods枚举匹配
+"ReceiveMessage"           // 接收新消息
+"ReceiveMessageUpdate"     // 接收消息更新(流式输出)
+"ReceiveBotResponseStatus" // 接收Bot响应状态
+"ReceiveUserTypingState"   // 接收用户输入状态
+"UserJoined"              // 用户加入
+"ChatEdited"              // 聊天编辑
+"ChatDeleted"             // 聊天删除
+```
+
+## 流式输出实现 (后端)
+### 核心流程
+在 [webapi/Plugins/Chat/ChatPlugin.cs](mdc:webapi/Plugins/Chat/ChatPlugin.cs) 中:
+
+1. **StreamResponseToClientAsync()** - 主要流式输出方法
+   - 获取聊天完成服务
+   - 创建流式请求
+   - 创建初始空消息 (`CreateBotMessageOnClient`)
+   - 流式累积内容并更新 (`UpdateMessageOnClient`)
+
+2. **关键方法**:
+   - `CreateBotMessageOnClient()` - 创建初始消息
+   - `UpdateMessageOnClient()` - 更新消息内容
+   - `HandleBotResponseAsync()` - 处理最终响应和Token统计
+
+### 流式处理模式
+```csharp
+// 流式获取AI响应
+var stream = chatCompletion.GetStreamingChatMessageContentsAsync(...);
+
+// 逐片段处理
+await foreach (var contentPiece in stream)
+{
+    chatMessage.Content += contentPiece;  // 累积内容
+    await UpdateMessageOnClient(chatMessage, cancellationToken);  // 立即推送
+}
+```
+
+## SignalR 客户端 (前端)
+### 连接管理
+- [webapp/src/redux/features/message-relay/signalRHubConnection.ts](mdc:webapp/src/redux/features/message-relay/signalRHubConnection.ts)
+
+### 连接配置
+```typescript
+const hubConnection = new signalR.HubConnectionBuilder()
+    .withUrl('/messageRelayHub', {
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets,
+    })
+    .withAutomaticReconnect()  // 自动重连策略
+    .withHubProtocol(new signalR.JsonHubProtocol())
+    .build();
+```
+
+### 事件处理
+关键SignalR事件回调方法枚举:
+```typescript
+enum SignalRCallbackMethods {
+    ReceiveMessage = 'ReceiveMessage',
+    ReceiveMessageUpdate = 'ReceiveMessageUpdate',  // 流式输出核心事件
+    ReceiveBotResponseStatus = 'ReceiveBotResponseStatus',
+    ReceiveUserTypingState = 'ReceiveUserTypingState',
+    // ...其他事件
+}
+```
+
+## 流式输出接收 (前端)
+### 消息更新处理
+在 `signalRHubConnection.ts` 中处理流式更新:
+```typescript
+hubConnection.on(SignalRCallbackMethods.ReceiveMessageUpdate, (message: IChatMessage) => {
+    const { chatId, id: messageId, content } = message;
+    
+    // 判断是内容更新还是token统计更新
+    store.dispatch({
+        type: 'conversations/updateMessageProperty',
+        payload: {
+            chatId,
+            messageIdOrIndex: messageId,
+            property: message.tokenUsage ? 'tokenUsage' : 'content',
+            value: message.tokenUsage ?? content,
+            frontLoad: true,
+        },
+    });
+});
+```
+
+### 流式显示效果
+- **逐字显示**: 每收到内容片段立即更新UI
+- **状态指示**: 显示"AI正在思考中..."等状态
+- **智能回退**: 超时后回退到传统API模式
+
+## 连接状态管理
+### 自动重连
+```typescript
+// 连接断开处理
+hubConnection.onclose((error) => {
+    // 显示连接错误警告
+});
+
+// 重连中处理
+hubConnection.onreconnecting((error) => {
+    // 显示重连状态
+});
+
+// 重连成功处理
+hubConnection.onreconnected((connectionId) => {
+    // 显示重连成功提示
+});
+```
+
+### 连接超时配置
+```typescript
+// 保持连接的超时设置
+hubConnection.serverTimeoutInMilliseconds = 60000;  // 60秒
+```
+
+## 开发最佳实践
+1. **事件名称一致性**: 前后端事件名称必须完全匹配
+2. **错误处理**: 处理连接断开、重连等异常情况
+3. **性能优化**: 避免频繁的DOM更新，使用防抖
+4. **状态同步**: 确保Redux状态与SignalR事件同步
+5. **取消令牌**: 支持操作取消，避免内存泄露
+
+## 调试技巧
+1. **浏览器开发者工具**: 检查WebSocket连接
+2. **SignalR日志**: 启用详细日志记录
+3. **Redux DevTools**: 监控状态变化
+4. **网络面板**: 检查消息传输情况

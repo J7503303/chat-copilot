@@ -1,0 +1,70 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# WebAPI 后端开发规则
+
+## 核心入口
+- [webapi/Program.cs](mdc:webapi/Program.cs) - 应用程序启动配置
+- [webapi/Controllers/ChatController.cs](mdc:webapi/Controllers/ChatController.cs) - 主要聊天API控制器
+
+## 重要控制器
+- **ChatController**: 处理聊天消息和AI响应 `POST /chats/{chatId}/messages`
+- **ChatHistoryController**: 聊天历史管理
+- **DocumentController**: 文档上传和管理
+- **PluginController**: 插件管理
+
+## Semantic Kernel 集成
+### 核心插件
+- [webapi/Plugins/Chat/ChatPlugin.cs](mdc:webapi/Plugins/Chat/ChatPlugin.cs) - 主要聊天逻辑
+  - `ChatAsync()` - 聊天处理入口方法
+  - `StreamResponseToClientAsync()` - 流式输出实现
+  - `GetAllowedChatHistoryAsync()` - 智能历史管理
+
+### 内存管理
+- [webapi/Plugins/Chat/KernelMemoryRetriever.cs](mdc:webapi/Plugins/Chat/KernelMemoryRetriever.cs) - 语义记忆检索
+
+## 存储层
+### 仓库模式
+- [webapi/Storage/ChatMessageRepository.cs](mdc:webapi/Storage/ChatMessageRepository.cs) - 消息存储
+- [webapi/Storage/ChatSessionRepository.cs](mdc:webapi/Storage/ChatSessionRepository.cs) - 会话存储
+- [webapi/Storage/ChatParticipantRepository.cs](mdc:webapi/Storage/ChatParticipantRepository.cs) - 参与者存储
+
+### 存储配置
+```json
+"ChatStore": {
+  "Type": "volatile|filesystem|cosmos",
+  "Filesystem": { "FilePath": "./data/chatstore.json" }
+}
+```
+
+## SignalR 实时通信
+- [webapi/Hubs/MessageRelayHub.cs](mdc:webapi/Hubs/MessageRelayHub.cs) - SignalR Hub
+- 关键事件:
+  - `ReceiveMessage` - 新消息
+  - `ReceiveMessageUpdate` - 消息更新(流式)
+  - `ReceiveBotResponseStatus` - Bot状态
+
+## 配置管理
+- [webapi/appsettings.json](mdc:webapi/appsettings.json) - 主配置文件
+- 关键配置节:
+  - `Service` - 服务设置
+  - `Authentication` - 认证配置  
+  - `ChatStore` - 存储配置
+  - `Prompts` - 提示词配置
+  - `KernelMemory` - 内存服务配置
+
+## 开发模式
+1. **依赖注入**: 服务通过DI容器管理
+2. **异步编程**: 全面使用async/await
+3. **取消令牌**: 支持操作取消和超时
+4. **错误处理**: 结构化异常处理
+5. **日志记录**: ILogger集成
+
+## API设计原则
+- RESTful API设计
+- 支持CORS跨域
+- JWT/Azure AD认证
+- 健康检查端点 `/healthz`
+- Swagger文档支持

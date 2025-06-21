@@ -1,0 +1,45 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Chat Copilot 项目架构规则
+
+## 项目概述
+Chat Copilot 是基于 Microsoft Semantic Kernel 的智能聊天应用，采用前后端分离架构。
+
+## 核心目录结构
+- [webapi/](mdc:webapi/) - 后端Web API服务，基于ASP.NET Core + Semantic Kernel
+- [webapp/](mdc:webapp/) - 前端React应用，使用TypeScript + Redux + Fluent UI
+- [memorypipeline/](mdc:memorypipeline/) - 内存处理管道服务
+- [plugins/](mdc:plugins/) - 插件系统
+- [electron-client/](mdc:electron-client/) - 桌面客户端
+
+## 技术栈
+### 后端
+- ASP.NET Core 8.0
+- Microsoft Semantic Kernel (SK)
+- SignalR (实时通信)
+- 存储：Volatile/FileSystem/CosmosDB
+
+### 前端  
+- React 18 + TypeScript
+- Redux Toolkit (状态管理)
+- Fluent UI React Components
+- @microsoft/signalr (实时通信)
+
+## 核心配置文件
+- [webapi/appsettings.json](mdc:webapi/appsettings.json) - 后端主配置
+- [webapp/package.json](mdc:webapp/package.json) - 前端依赖配置
+
+## 关键概念
+- **ChatPlugin**: 核心聊天逻辑封装在 [webapi/Plugins/Chat/ChatPlugin.cs](mdc:webapi/Plugins/Chat/ChatPlugin.cs)
+- **SignalR Hub**: 实时通信中心 [webapi/Hubs/MessageRelayHub.cs](mdc:webapi/Hubs/MessageRelayHub.cs)
+- **流式输出**: 通过SignalR实现AI响应的逐字显示
+- **存储仓库**: 聊天数据通过Repository模式管理
+
+## 开发流程
+1. 后端提供REST API + SignalR Hub
+2. 前端通过HTTP调用API，通过SignalR接收实时更新
+3. SK负责AI逻辑处理和插件管理
+4. 状态通过Redux管理，持久化到localStorage/后端存储

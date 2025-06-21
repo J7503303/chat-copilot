@@ -1,0 +1,197 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 配置管理和部署规则
+
+## 核心配置文件
+### 后端配置
+- [webapi/appsettings.json](mdc:webapi/appsettings.json) - 主配置文件
+- [webapi/appsettings.Development.json](mdc:webapi/appsettings.Development.json) - 开发环境配置
+- [webapi/nuget.config](mdc:webapi/nuget.config) - NuGet源配置
+
+### 前端配置  
+- [webapp/package.json](mdc:webapp/package.json) - NPM依赖和脚本
+- [webapp/tsconfig.json](mdc:webapp/tsconfig.json) - TypeScript配置
+- [webapp/.eslintrc.cjs](mdc:webapp/.eslintrc.cjs) - ESLint配置
+
+## 重要配置项详解
+### 服务配置
+```json
+"Service": {
+    "TimeoutLimitInS": "120",                    // API超时限制
+    "SemanticPluginsDirectory": "./Plugins/SemanticPlugins",
+    "NativePluginsDirectory": "./Plugins/NativePlugins",
+    "KeyVault": "",                              // Azure Key Vault URI
+    "InMaintenance": false                       // 维护模式开关
+}
+```
+
+### 认证配置
+```json
+"Authentication": {
+    "Type": "None|AzureAd",                     // 认证类型
+    "AzureAd": {
+        "Instance": "https://login.microsoftonline.com",
+        "TenantId": "",                         // Azure AD租户ID
+        "ClientId": "",                         // 应用ID
+        "Audience": "",                         // 受众
+        "Scopes": "access_as_user"              // 访问范围
+    }
+}
+```
+
+### 存储配置
+```json
+"ChatStore": {
+    "Type": "volatile|filesystem|cosmos",       // 存储类型
+    "Filesystem": {
+        "FilePath": "./data/chatstore.json"     // 文件系统存储路径
+    },
+    "Cosmos": {
+        "Database": "CopilotChat",              // CosmosDB数据库名
+        "ChatSessionsContainer": "chatsessions",
+        "ChatMessagesContainer": "chatmessages",
+        "ChatMemorySourcesContainer": "chatmemorysources",
+        "ChatParticipantsContainer": "chatparticipants"
+    }
+}
+```
+
+### AI服务配置
+```json
+"KernelMemory": {
+    "DocumentStorageType": "SimpleFileStorage|AzureBlobs",
+    "TextGeneratorType": "OpenAI|AzureOpenAI",
+    "DataIngestion": {
+        "OrchestrationType": "InProcess|Distributed",
+        "EmbeddingGeneratorTypes": ["OpenAI"],
+        "MemoryDbTypes": ["SimpleVectorDb"],
+        "ImageOcrType": "None|AzureAIDocIntel|Tesseract"
+    },
+    "Retrieval": {
+        "MemoryDbType": "SimpleVectorDb|AzureAISearch|Qdrant",
+        "EmbeddingGeneratorType": "OpenAI|AzureOpenAI"
+    }
+}
+```
+
+## 密钥管理
+### 开发环境
+使用 dotnet user-secrets 管理敏感信息:
+```bash
+# 设置OpenAI API密钥
+dotnet user-secrets set "KernelMemory:Services:OpenAI:APIKey" "your-api-key"
+
+# 设置Azure服务连接字符串  
+dotnet user-secrets set "ChatStore:Cosmos:ConnectionString" "your-cosmos-connection"
+
+# 设置Azure AI服务密钥
+dotnet user-secrets set "KernelMemory:Services:AzureAISearch:APIKey" "your-search-key"
+```
+
+### 生产环境
+- **环境变量**: 通过环境变量注入敏感配置
+- **Azure Key Vault**: 使用Key Vault存储密钥
+- **Azure Managed Identity**: 无密钥认证方式
+
+## CORS配置
+```json
+"AllowedOrigins": [
+    "http://localhost:8440",     // 前端开发服务器
+    "https://localhost:8440",    // HTTPS前端
+    "http://localhost:3000",     // 备用端口
+    "https://localhost:3000"
+]
+```
+
+## 日志和监控配置
+### Application Insights
+```json
+"APPLICATIONINSIGHTS_CONNECTION_STRING": "your-app-insights-connection"
+```
+
+### 内容安全
+```json
+"ContentSafety": {
+    "Enabled": true,
+    "ViolationThreshold": 4,                    // 0-6级别
+    "Endpoint": "https://your-content-safety.cognitiveservices.azure.com/"
+}
+```
+
+## 容器化部署
+### Docker配置
+- [docker/docker-compose.yaml](mdc:docker/docker-compose.yaml) - 容器编排
+- [docker/webapi/Dockerfile](mdc:docker/webapi/Dockerfile) - 后端镜像
+- [docker/webapp/Dockerfile](mdc:docker/webapp/Dockerfile) - 前端镜像
+
+### 端口配置
+默认端口设置:
+- **WebAPI**: 40443
+- **WebApp**: 8440  
+- **MemoryPipeline**: 配置文件指定
+
+## 环境配置
+### 开发环境设置
+1. **后端**: `appsettings.Development.json` 优先级最高
+2. **前端**: `.env.development` 文件配置
+3. **调试**: Visual Studio/VS Code 配置
+
+### 生产环境设置
+1. **容器**: Docker环境变量注入
+2. **云服务**: Azure App Service配置
+3. **CDN**: 静态资源分发配置
+
+## 性能配置
+### 连接池设置
+```json
+"ConnectionStrings": {
+    "DefaultConnection": "配置数据库连接池参数"
+}
+```
+
+### 缓存配置
+```json
+"MemoryCache": {
+    "SizeLimit": 1000,
+    "ExpirationTime": "00:30:00"
+}
+```
+
+## 安全配置
+### HTTPS配置
+- 开发环境: dotnet dev-certs生成证书
+- 生产环境: Let's Encrypt或商业证书
+
+### 数据保护
+```json
+"DataProtection": {
+    "KeyRing": "配置密钥环存储位置"
+}
+```
+
+## 配置验证
+### 启动时验证
+在 `Program.cs` 中添加配置验证:
+```csharp
+builder.Services.Configure<PromptsOptions>(
+    builder.Configuration.GetSection("Prompts"));
+builder.Services.Configure<ChatStoreOptions>(
+    builder.Configuration.GetSection("ChatStore"));
+```
+
+### 健康检查
+- **端点**: `/healthz`
+- **检查项**: 数据库连接、AI服务连接、存储访问
+
+## 部署脚本
+### PowerShell脚本
+- [scripts/Configure.ps1](mdc:scripts/Configure.ps1) - 配置脚本
+- [scripts/deploy/](mdc:scripts/deploy/) - 部署脚本集合
+
+### 自动化部署
+- **GitHub Actions**: CI/CD流水线
+- **Azure DevOps**: 企业级部署
+- **Docker Compose**: 本地部署

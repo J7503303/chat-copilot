@@ -1,0 +1,89 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# WebApp 前端开发规则
+
+## 项目入口
+- [webapp/src/App.tsx](mdc:webapp/src/App.tsx) - 应用程序根组件
+- [webapp/src/index.tsx](mdc:webapp/src/index.tsx) - 应用程序启动入口
+- [webapp/package.json](mdc:webapp/package.json) - 依赖管理
+
+## 核心组件架构
+### 主要视图组件
+- [webapp/src/components/views/ChatView.tsx](mdc:webapp/src/components/views/ChatView.tsx) - 聊天主视图
+- [webapp/src/components/chat/ChatWindow.tsx](mdc:webapp/src/components/chat/ChatWindow.tsx) - 聊天窗口
+- [webapp/src/components/chat/ChatRoom.tsx](mdc:webapp/src/components/chat/ChatRoom.tsx) - 聊天室
+- [webapp/src/components/chat/ChatInput.tsx](mdc:webapp/src/components/chat/ChatInput.tsx) - 消息输入框
+
+### 聊天历史组件
+- [webapp/src/components/chat/chat-history/](mdc:webapp/src/components/chat/chat-history/) - 聊天历史相关组件
+- [webapp/src/components/chat/chat-list/](mdc:webapp/src/components/chat/chat-list/) - 聊天列表组件
+
+## 状态管理 (Redux)
+### Store配置
+- [webapp/src/redux/app/store.ts](mdc:webapp/src/redux/app/store.ts) - Redux store配置
+- [webapp/src/redux/app/rootReducer.ts](mdc:webapp/src/redux/app/rootReducer.ts) - 根reducer
+
+### 核心Slice
+- [webapp/src/redux/features/conversations/conversationsSlice.ts](mdc:webapp/src/redux/features/conversations/conversationsSlice.ts) - 聊天会话状态
+- [webapp/src/redux/features/app/appSlice.ts](mdc:webapp/src/redux/features/app/appSlice.ts) - 应用全局状态
+- [webapp/src/redux/features/plugins/pluginsSlice.ts](mdc:webapp/src/redux/features/plugins/pluginsSlice.ts) - 插件状态
+- [webapp/src/redux/features/users/usersSlice.ts](mdc:webapp/src/redux/features/users/usersSlice.ts) - 用户状态
+
+## 核心Hooks
+### 主要业务Hook
+- [webapp/src/libs/hooks/useChat.ts](mdc:webapp/src/libs/hooks/useChat.ts) - 聊天核心逻辑Hook
+  - `createChat()` - 创建新聊天
+  - `getResponse()` - 发送消息获取响应
+  - `loadChats()` - 加载聊天历史
+
+### Redux Hooks
+- [webapp/src/redux/app/hooks.ts](mdc:webapp/src/redux/app/hooks.ts) - 类型安全的Redux hooks
+
+## SignalR 实时通信
+- [webapp/src/redux/features/message-relay/signalRHubConnection.ts](mdc:webapp/src/redux/features/message-relay/signalRHubConnection.ts) - SignalR连接管理
+- 关键事件处理:
+  - `ReceiveMessage` - 接收新消息
+  - `ReceiveMessageUpdate` - 接收消息更新(流式输出)
+  - `ReceiveBotResponseStatus` - 接收Bot状态
+  - `ReceiveUserTypingState` - 用户输入状态
+
+## 服务层
+### API服务
+- [webapp/src/libs/services/ChatService.ts](mdc:webapp/src/libs/services/ChatService.ts) - 聊天API服务
+- [webapp/src/libs/services/BaseService.ts](mdc:webapp/src/libs/services/BaseService.ts) - 基础API服务
+- [webapp/src/libs/services/DocumentImportService.ts](mdc:webapp/src/libs/services/DocumentImportService.ts) - 文档导入服务
+
+### 认证服务
+- [webapp/src/libs/auth/AuthHelper.ts](mdc:webapp/src/libs/auth/AuthHelper.ts) - 认证辅助类
+
+## 数据模型
+- [webapp/src/libs/models/](mdc:webapp/src/libs/models/) - TypeScript类型定义
+  - `ChatMessage.ts` - 聊天消息模型
+  - `ChatSession.ts` - 聊天会话模型
+  - `ChatUser.ts` - 用户模型
+
+## 常量和配置
+- [webapp/src/Constants.ts](mdc:webapp/src/Constants.ts) - 应用常量
+- [webapp/src/assets/strings.ts](mdc:webapp/src/assets/strings.ts) - 字符串资源
+
+## 开发模式
+1. **函数式组件**: 全面使用React Hooks
+2. **TypeScript**: 强类型检查
+3. **Redux Toolkit**: 现代Redux状态管理
+4. **Fluent UI**: Microsoft设计系统
+5. **异步处理**: Promise + async/await
+
+## 组件设计原则
+- 职责单一原则
+- Hook复用业务逻辑
+- Props接口清晰定义
+- 错误边界处理
+- 性能优化(useMemo, useCallback)
+
+## 样式管理
+- Fluent UI组件样式
+- makeStyles创建自定义样式
+- 响应式设计支持
