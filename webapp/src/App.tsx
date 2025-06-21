@@ -3,7 +3,6 @@ import { FluentProvider, Subtitle1, makeStyles, shorthands, tokens } from '@flue
 
 import * as React from 'react';
 import { useCallback, useEffect } from 'react';
-import DoctorChatApp from './DoctorChatApp';
 import Chat from './components/chat/Chat';
 import { Loading, Login } from './components/views';
 import { AuthHelper } from './libs/auth/AuthHelper';
@@ -45,27 +44,6 @@ export const useClasses = makeStyles({
     },
 });
 
-// 定义医生模式的类型接口
-interface DoctorModeState {
-    isDoctorMode: boolean;
-    doctorId: string;
-    doctorName: string;
-    deptName: string;
-    patientName: string;
-}
-
-// 更好的做法是使用Record类型
-type UrlParamsRecord = Record<string, string>;
-
-// 定义postMessage数据的类型接口
-interface PostMessageData {
-    type: string;
-    data: {
-        url: string;
-        params: UrlParamsRecord;
-    };
-}
-
 export enum AppState {
     ProbeForBackend,
     SettingUserInfo,
@@ -76,20 +54,6 @@ export enum AppState {
     Chat,
     SigningOut,
 }
-
-const checkDoctorChatMode = (): DoctorModeState => {
-    const params = new URLSearchParams(window.location.search);
-    const doctorId = params.get('doctor_id') ?? params.get('userId');
-    const isDoctor = Boolean(doctorId?.trim());
-    
-    return {
-        isDoctorMode: isDoctor,
-        doctorId: doctorId ?? '',
-        doctorName: params.get('doctor_name') ?? params.get('userName') ?? '',
-        deptName: params.get('dept_name') ?? '',
-        patientName: params.get('patient_name') ?? ''
-    };
-};
 
 const App = () => {
     const classes = useClasses();
@@ -102,95 +66,9 @@ const App = () => {
     const chat = useChat();
     const file = useFile();
 
-    // 检查医生聊天模式 - 监听URL参数变化
-    const [doctorMode, setDoctorMode] = React.useState<DoctorModeState>(() => checkDoctorChatMode());
-
-    // 通知父窗口URL参数变化（用于electron集成）
-    const notifyParentOfUrlChange = React.useCallback((newDoctorMode: DoctorModeState) => {
-        if (newDoctorMode.isDoctorMode && window.parent !== window) {
-            try {
-                const params = new URLSearchParams(window.location.search);
-                const paramObj: UrlParamsRecord = {};
-                params.forEach((value, key) => {
-                    paramObj[key] = value;
-                });
-                
-                const messageData: PostMessageData = {
-                    type: 'URL_CHANGED',
-                    data: {
-                        url: window.location.href,
-                        params: paramObj
-                    }
-                };
-                
-                window.parent.postMessage(messageData, '*');
-            } catch (e) {
-                // 忽略跨域错误
-            }
-        }
-    }, []);
-
-    // 处理URL参数变化
-    const handleDoctorModeChange = React.useCallback((newDoctorMode: DoctorModeState) => {
-        if (JSON.stringify(newDoctorMode) !== JSON.stringify(doctorMode)) {
-            setDoctorMode(newDoctorMode);
-            notifyParentOfUrlChange(newDoctorMode);
-        }
-    }, [doctorMode, notifyParentOfUrlChange]);
-
-    // 监听URL参数变化
-    React.useEffect(() => {
-        let lastUrl = window.location.href;
-        
-        const checkAndUpdate = () => {
-            // 只有URL实际改变时才检查
-            if (window.location.href !== lastUrl) {
-                lastUrl = window.location.href;
-                const newDoctorMode = checkDoctorChatMode();
-                handleDoctorModeChange(newDoctorMode);
-            }
-        };
-
-        // 监听各种URL变化事件
-        window.addEventListener('popstate', checkAndUpdate);
-        window.addEventListener('hashchange', checkAndUpdate);
-        
-        // 定期检查URL参数变化（备选方案，但减少频率）
-        const intervalId = setInterval(checkAndUpdate, 5000);
-        
-        return () => {
-            window.removeEventListener('popstate', checkAndUpdate);
-            window.removeEventListener('hashchange', checkAndUpdate);
-            clearInterval(intervalId);
-        };
-    }, [handleDoctorModeChange]);
-
     const handleAppStateChange = useCallback((newState: AppState) => {
         setAppState(newState);
     }, []);
-
-    // 设置用户信息（适用于医生模式）
-    const setupUserInfoForDoctorMode = useCallback(() => {
-        if (isAuthenticated && doctorMode.isDoctorMode) {
-            const account = instance.getActiveAccount();
-            if (account) {
-                dispatch(
-                    setActiveUserInfo({
-                        id: `${account.localAccountId}.${account.tenantId}`,
-                        email: account.username,
-                        username: account.name ?? account.username,
-                    }),
-                );
-            }
-        }
-    }, [isAuthenticated, doctorMode.isDoctorMode, instance, dispatch]);
-
-    React.useEffect(() => {
-        // 如果是医生模式，设置用户信息
-        if (doctorMode.isDoctorMode) {
-            setupUserInfoForDoctorMode();
-        }
-    }, [doctorMode.isDoctorMode, setupUserInfoForDoctorMode]);
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -249,38 +127,26 @@ const App = () => {
 
     const theme = features[FeatureKeys.DarkMode].enabled ? semanticKernelDarkTheme : semanticKernelLightTheme;
 
-    // 如果是医生聊天模式，直接渲染医生聊天界面
-    if (doctorMode.isDoctorMode) {
-        return (
-            <FluentProvider className="app-container" theme={theme}>
-                <DoctorChatApp />
-            </FluentProvider>
-        );
-    }
-
-    // 原有的正常聊天模式
     return (
         <FluentProvider className="app-container" theme={theme}>
-            <div className={classes.container}>
-                {AuthHelper.isAuthAAD() ? (
-                    <>
-                        <UnauthenticatedTemplate>
-                            <div className={classes.container}>
-                                <div className={classes.header} aria-label="Application Header">
-                                    <Subtitle1 as="h1">Chat Copilot</Subtitle1>
-                                </div>
-                                {appState === AppState.SigningOut && <Loading text="Signing you out..." />}
-                                {appState !== AppState.SigningOut && <Login />}
+            {AuthHelper.isAuthAAD() ? (
+                <>
+                    <UnauthenticatedTemplate>
+                        <div className={classes.container}>
+                            <div className={classes.header} aria-label="Application Header">
+                                <Subtitle1 as="h1">Chat Copilot</Subtitle1>
                             </div>
-                        </UnauthenticatedTemplate>
-                        <AuthenticatedTemplate>
-                            <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
-                        </AuthenticatedTemplate>
-                    </>
-                ) : (
-                    <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
-                )}
-            </div>
+                            {appState === AppState.SigningOut && <Loading text="Signing you out..." />}
+                            {appState !== AppState.SigningOut && <Login />}
+                        </div>
+                    </UnauthenticatedTemplate>
+                    <AuthenticatedTemplate>
+                        <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
+                    </AuthenticatedTemplate>
+                </>
+            ) : (
+                <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
+            )}
         </FluentProvider>
     );
 };

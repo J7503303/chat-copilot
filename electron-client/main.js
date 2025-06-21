@@ -521,67 +521,10 @@ function createHttpServer() {
                 }
             };
 
-            // 改进的参数处理 - 自动清空未传递的参数，保留传递的参数（包括空字符串）
-            const cleanParams = {
-                doctor: {},
-                department: {},
-                patient: {}
-            };
-
-            // 处理所有可能的参数，未传递的设为空字符串
-            const allParamDefs = {
-                'doctor': ['id', 'code', 'name'],
-                'department': ['id', 'code', 'name'],
-                'patient': ['id', 'name', 'bed', 'sex', 'age']
-            };
-
-            Object.keys(allParamDefs).forEach(key => {
-                allParamDefs[key].forEach(subKey => {
-                    const paramName = getParamName(key, subKey);
-                    if (req.query.hasOwnProperty(paramName)) {
-                        // 参数被传递（包括空字符串）
-                        cleanParams[key][subKey] = req.query[paramName] || '';
-                    } else {
-                        // 参数未传递，设为空字符串以清空显示
-                        cleanParams[key][subKey] = '';
-                    }
-                });
-            });
-
-            // 清理空对象（如果所有子参数都为空）
-            Object.keys(cleanParams).forEach(key => {
-                const hasNonEmptyValue = Object.values(cleanParams[key]).some(value => value !== '');
-                if (!hasNonEmptyValue) {
-                    // 保留空对象，用于清空显示
-                    // delete cleanParams[key];
-                }
-            });
-
-            // 辅助函数：根据对象键和子键获取对应的查询参数名
-            function getParamName(key, subKey) {
-                const paramMap = {
-                    'doctor': {
-                        'id': 'doctor_id',
-                        'code': 'doctor_code',
-                        'name': 'doctor_name'
-                    },
-                    'department': {
-                        'id': 'dept_id',
-                        'code': 'dept_code',
-                        'name': 'dept_name'
-                    },
-                    'patient': {
-                        'id': 'patient_id',
-                        'name': 'patient_name',
-                        'bed': 'patient_bed',
-                        'sex': 'patient_sex',
-                        'age': 'patient_age'
-                    }
-                };
-                return paramMap[key]?.[subKey] || `${key}_${subKey}`;
-            }
-
-            console.log('参数处理:', { original: params, cleaned: cleanParams });
+            // 过滤掉空值
+            const cleanParams = JSON.parse(JSON.stringify(params, (key, value) => {
+                return value === undefined || value === '' ? undefined : value;
+            }));
 
             // 显示主窗口并确保置顶
             showWindow();
@@ -607,18 +550,15 @@ function createHttpServer() {
                 toggleCompactMode();
             }
 
-            // 向页面发送参数 - 总是发送消息，即使参数为空
-            const messageData = {
-                page: page || currentTab,
-                params: cleanParams,
-                timestamp: new Date().toISOString()
-            };
-
-            if (mainWindow && mainWindow.webContents) {
-                mainWindow.webContents.send('navigation-params', messageData);
-                console.log('Navigation params sent:', messageData.page);
-            } else {
-                console.log('Warning: mainWindow or webContents unavailable');
+            // 向页面发送参数
+            if (mainWindow && Object.keys(cleanParams).some(key =>
+                Object.keys(cleanParams[key]).some(subKey => cleanParams[key][subKey] !== undefined)
+            )) {
+                mainWindow.webContents.send('navigation-params', {
+                    page: page || currentTab,
+                    params: cleanParams,
+                    timestamp: new Date().toISOString()
+                });
             }
 
             // 返回简化的成功响应
@@ -629,39 +569,6 @@ function createHttpServer() {
 
         } catch (error) {
             console.error('导航接口错误:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        }
-    });
-
-    // 重置接口 - 清空所有参数
-    server.get('/api/v1/reset', (req, res) => {
-        try {
-            console.log('收到重置请求');
-
-            // 显示主窗口
-            showWindow();
-
-            // 发送重置消息到前端
-            const messageData = {
-                reset: true,
-                timestamp: new Date().toISOString()
-            };
-
-            if (mainWindow && mainWindow.webContents) {
-                mainWindow.webContents.send('navigation-params', messageData);
-                console.log('Reset message sent');
-            }
-
-            res.json({
-                success: true,
-                message: '所有参数已重置'
-            });
-
-        } catch (error) {
-            console.error('重置接口错误:', error);
             res.status(500).json({
                 success: false,
                 error: error.message

@@ -177,7 +177,7 @@ export const ChatHistoryItem: React.FC<ChatHistoryItemProps> = ({ message, messa
                     className={classes.persona}
                     avatar={avatar}
                     presence={
-                        !features[FeatureKeys.SimplifiedExperience].enabled
+                        !features[FeatureKeys.SimplifiedExperience].enabled && !isMe
                             ? { status: 'available' }
                             : undefined
                     }
@@ -231,7 +231,11 @@ export const ChatHistoryItem: React.FC<ChatHistoryItemProps> = ({ message, messa
                 <Persona
                     className={classes.persona}
                     avatar={avatar}
-                    presence={undefined}
+                    presence={
+                        !features[FeatureKeys.SimplifiedExperience].enabled && !isMe
+                            ? { status: 'available' }
+                            : undefined
+                    }
                 />
             )}
             {features[FeatureKeys.RLHF].enabled && message.userFeedback === UserFeedback.Positive && (
